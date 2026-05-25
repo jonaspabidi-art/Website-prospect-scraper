@@ -78,7 +78,7 @@ export default function PipelinePage() {
   };
 
   return (
-    <div style={{ padding: '48px 32px 80px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="pipeline-wrap" style={{ padding: '48px 32px 80px', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ marginBottom: 36 }}>
         <h1 style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.025em', margin: 0, lineHeight: 1.15 }}>Pipeline</h1>
         <p style={{ color: 'var(--text-muted)', fontSize: 15, margin: '6px 0 0', letterSpacing: '-0.005em' }}>
@@ -86,7 +86,7 @@ export default function PipelinePage() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 16, flex: 1, alignItems: 'start', overflowX: 'auto' }}>
+      <div className="pipeline-columns" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 16, flex: 1, alignItems: 'start', overflowX: 'auto' }}>
         {STAGES.map(stage => {
           const cards = byStage(stage);
           const isOver = dragOver === stage;

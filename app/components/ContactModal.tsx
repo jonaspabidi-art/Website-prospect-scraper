@@ -90,6 +90,7 @@ Jonas`;
 
   return (
     <div
+      className="modal-backdrop"
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0,
@@ -102,6 +103,7 @@ Jonas`;
       }}
     >
       <div
+        className="modal-inner"
         onClick={e => e.stopPropagation()}
         style={{
           background: 'var(--bg)',

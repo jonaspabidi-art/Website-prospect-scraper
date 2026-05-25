@@ -95,7 +95,7 @@ export default function ProspectsPage() {
   };
 
   return (
-    <div style={{ padding: '48px 56px 80px' }}>
+    <div className="page-wrap" style={{ padding: '48px 56px 80px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 36, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.025em', margin: 0, lineHeight: 1.15 }}>Prospects</h1>
@@ -106,7 +106,7 @@ export default function ProspectsPage() {
       </div>
 
       {/* Filter bar */}
-      <div style={{
+      <div className="filter-bar" style={{
         display: 'flex', alignItems: 'center', gap: 10,
         padding: 14, flexWrap: 'wrap',
         border: '1px solid var(--border)',
@@ -130,7 +130,7 @@ export default function ProspectsPage() {
           <option value="">Status: alla</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+        <div className="filter-search" style={{ position: 'relative', flex: 1, minWidth: 220 }}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
             style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', pointerEvents: 'none' }}>
             <circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/>
@@ -144,8 +144,8 @@ export default function ProspectsPage() {
         </div>
       </div>
 
-      {/* Table */}
-      <div style={{
+      {/* Table (desktop) */}
+      <div className="desktop-table" style={{
         border: '1px solid var(--border)',
         borderRadius: 'var(--r-md)',
         overflow: 'hidden',
@@ -295,6 +295,95 @@ export default function ProspectsPage() {
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* Cards (mobile) */}
+      <div className="mobile-cards">
+        {prospects.length === 0 && (
+          <div style={{
+            border: '1px dashed var(--border-strong)',
+            borderRadius: 'var(--r-md)',
+            padding: '40px 24px',
+            textAlign: 'center',
+            color: 'var(--text-muted)',
+            background: 'var(--bg-subtle)',
+          }}>
+            <div style={{ fontWeight: 500, color: 'var(--text)', marginBottom: 4 }}>Inga prospects matchar dina filter</div>
+            <div style={{ fontSize: 13 }}>Prova att rensa filtren.</div>
+          </div>
+        )}
+        {prospects.map(p => {
+          const sc = scoreBadge(p.priorityScore);
+          const sp = statusPill(p.status);
+          return (
+            <div
+              key={p.id}
+              onClick={() => setModal(p)}
+              style={{
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r-md)',
+                padding: '14px 16px',
+                boxShadow: 'var(--shadow-sm)',
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.3 }}>{p.name}</span>
+                <span style={{
+                  background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`,
+                  fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 'var(--r-pill)', flexShrink: 0,
+                }}>
+                  {p.priorityScore}
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
+                {p.job.industry} · {p.city || p.job.city}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                  <StatusBtn
+                    label="Ringd"
+                    active={p.status === 'Ringd'}
+                    disabled={updatingId === p.id}
+                    color="var(--accent)"
+                    activeBg="var(--accent-soft)"
+                    activeBorder="rgba(26,86,219,0.18)"
+                    activeColor="var(--accent-text)"
+                    onClick={() => updateStatus(p.id, p.status === 'Ringd' ? 'Ny' : 'Ringd')}
+                  />
+                  <StatusBtn
+                    label="Intresserad"
+                    active={p.status === 'Intresserad'}
+                    disabled={updatingId === p.id}
+                    color="var(--green)"
+                    activeBg="var(--green-soft)"
+                    activeBorder="var(--green-border)"
+                    activeColor="var(--green)"
+                    onClick={() => updateStatus(p.id, p.status === 'Intresserad' ? 'Ny' : 'Intresserad')}
+                  />
+                  <StatusBtn
+                    label="Nej"
+                    active={p.status === 'Nej'}
+                    disabled={updatingId === p.id}
+                    color="var(--red)"
+                    activeBg="var(--red-soft)"
+                    activeBorder="var(--red-border)"
+                    activeColor="var(--red)"
+                    onClick={() => updateStatus(p.id, p.status === 'Nej' ? 'Ny' : 'Nej')}
+                  />
+                </div>
+                <span style={{
+                  background: sp.bg, color: sp.color, border: `1px solid ${sp.border}`,
+                  fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 'var(--r-pill)',
+                  whiteSpace: 'nowrap', flexShrink: 0,
+                }}>
+                  {p.status}
+                </span>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Pagination */}

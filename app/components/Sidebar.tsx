@@ -40,7 +40,7 @@ export default function Sidebar() {
   const path = usePathname();
 
   return (
-    <aside style={{
+    <aside className="desktop-sidebar" style={{
       width: 232,
       flexShrink: 0,
       background: 'var(--bg-subtle)',

@@ -67,3 +67,70 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* ─── Mobile bottom nav (hidden on desktop) ───── */
+.mobile-bottomnav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: rgba(255,255,255,0.92);
+  border-top: 1px solid var(--border);
+  z-index: 50;
+  justify-content: space-around;
+  align-items: center;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  height: calc(58px + env(safe-area-inset-bottom, 0px));
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* Mobile prospect cards (hidden on desktop) */
+.mobile-cards { display: none; }
+
+/* ─── Mobile breakpoint ─────────────────────── */
+@media (max-width: 768px) {
+  /* Navigation */
+  .desktop-sidebar  { display: none !important; }
+  .mobile-bottomnav { display: flex; }
+
+  /* Page padding */
+  .page-wrap {
+    padding: 24px 16px calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Filter bar: stack vertically */
+  .filter-bar { flex-direction: column !important; gap: 8px !important; }
+  .filter-bar select, .filter-search {
+    min-width: 0 !important;
+    width: 100% !important;
+    flex: 1 1 auto !important;
+  }
+
+  /* Prospects: hide table, show cards */
+  .desktop-table { display: none !important; }
+  .mobile-cards  { display: flex; flex-direction: column; gap: 10px; }
+
+  /* Pipeline: horizontal scroll */
+  .pipeline-wrap {
+    padding: 24px 0 0 !important;
+    height: auto !important;
+  }
+  .pipeline-columns {
+    grid-template-columns: repeat(5, 264px) !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 16px calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Contact modal: bottom sheet */
+  .modal-backdrop { align-items: flex-end !important; padding: 0 !important; }
+  .modal-inner {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: var(--r-lg) var(--r-lg) 0 0 !important;
+    max-height: 92dvh !important;
+  }
+
+  /* Search form: stack fields */
+  .sok-form-grid { grid-template-columns: 1fr !important; }
+}

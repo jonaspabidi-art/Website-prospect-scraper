@@ -76,7 +76,7 @@ export default function SokPage() {
   const lastProgressLine = activeJob?.progress?.split('\n').filter(Boolean).slice(-1)[0] ?? '';
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', padding: '48px 56px 80px' }}>
+    <div className="page-wrap" style={{ maxWidth: 760, margin: '0 auto', padding: '48px 56px 80px' }}>
       <header style={{ marginBottom: 36 }}>
         <h1 style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.025em', margin: 0, lineHeight: 1.15 }}>Sök prospects</h1>
         <p style={{ color: 'var(--text-muted)', fontSize: 15, margin: '6px 0 0', letterSpacing: '-0.005em' }}>
@@ -93,7 +93,7 @@ export default function SokPage() {
         marginBottom: 20,
       }}>
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 0.7fr auto', gap: 16, alignItems: 'flex-end' }}>
+          <div className="sok-form-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 0.7fr auto', gap: 16, alignItems: 'flex-end' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>Bransch</label>
               <input
