@@ -36,5 +36,6 @@ model Prospect {
   googleRating       Float?
   source             String?
   priorityScore      Int       @default(0)
+  status             String    @default("Ny")
   createdAt          DateTime  @default(now())
 }
