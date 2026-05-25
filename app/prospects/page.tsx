@@ -51,6 +51,7 @@ export default function ProspectsPage() {
   const [cities, setCities] = useState<string[]>([]);
   const [industryFilter, setIndustryFilter] = useState('');
   const [cityFilter, setCityFilter] = useState('');
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const fetchProspects = useCallback(async () => {
     const params = new URLSearchParams({ page: String(page) });
@@ -66,6 +67,17 @@ export default function ProspectsPage() {
   }, [page, search, statusFilter, industryFilter, cityFilter]);
 
   useEffect(() => { fetchProspects(); }, [fetchProspects]);
+
+  const updateStatus = async (id: string, status: string) => {
+    setUpdatingId(id);
+    setProspects(prev => prev.map(p => p.id === id ? { ...p, status } : p));
+    await fetch(`/api/prospects/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    setUpdatingId(null);
+  };
 
   useEffect(() => {
     fetch('/api/filter-options').then(r => r.json()).then(d => {
@@ -204,13 +216,38 @@ export default function ProspectsPage() {
                       </span>
                     </td>
                     <td style={{ padding: '14px 16px', verticalAlign: 'middle' }}>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
-                        <button
-                          onClick={() => setModal(p)}
-                          style={actionBtnStyle}
-                        >
-                          Kontakt
-                        </button>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                        <StatusBtn
+                          label="Ringd"
+                          active={p.status === 'Ringd'}
+                          disabled={updatingId === p.id}
+                          color="var(--accent)"
+                          activeBg="var(--accent-soft)"
+                          activeBorder="rgba(26,86,219,0.18)"
+                          activeColor="var(--accent-text)"
+                          onClick={() => updateStatus(p.id, p.status === 'Ringd' ? 'Ny' : 'Ringd')}
+                        />
+                        <StatusBtn
+                          label="Intresserad"
+                          active={p.status === 'Intresserad'}
+                          disabled={updatingId === p.id}
+                          color="var(--green)"
+                          activeBg="var(--green-soft)"
+                          activeBorder="var(--green-border)"
+                          activeColor="var(--green)"
+                          onClick={() => updateStatus(p.id, p.status === 'Intresserad' ? 'Ny' : 'Intresserad')}
+                        />
+                        <StatusBtn
+                          label="Nej"
+                          active={p.status === 'Nej'}
+                          disabled={updatingId === p.id}
+                          color="var(--red)"
+                          activeBg="var(--red-soft)"
+                          activeBorder="var(--red-border)"
+                          activeColor="var(--red)"
+                          onClick={() => updateStatus(p.id, p.status === 'Nej' ? 'Ny' : 'Nej')}
+                        />
+                        <button onClick={() => setModal(p)} style={actionBtnStyle}>Kontakt</button>
                       </div>
                     </td>
                   </tr>
@@ -376,3 +413,42 @@ const pageBtnStyle = (active: boolean): React.CSSProperties => ({
   cursor: 'pointer',
   transition: 'background 0.12s, border-color 0.12s',
 });
+
+function StatusBtn({ label, active, disabled, activeBg, activeBorder, activeColor, onClick }: {
+  label: string;
+  active: boolean;
+  disabled: boolean;
+  color: string;
+  activeBg: string;
+  activeBorder: string;
+  activeColor: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={active ? `Klicka för att ångra (sätt tillbaka till Ny)` : `Markera som ${label}`}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        padding: '4px 10px',
+        borderRadius: 'var(--r-pill)',
+        fontSize: 12, fontWeight: 500,
+        border: `1px solid ${active ? activeBorder : 'var(--border)'}`,
+        background: active ? activeBg : 'var(--bg-muted)',
+        color: active ? activeColor : 'var(--text-muted)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.6 : 1,
+        transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {active && (
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 6l3 3 5-5"/>
+        </svg>
+      )}
+      {label}
+    </button>
+  );
+}
