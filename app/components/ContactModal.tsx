@@ -44,7 +44,8 @@ function statusPill(status: string) {
 export default function ContactModal({ prospect, onClose, onRefresh }: Props) {
   const [mode, setMode] = useState<Mode>('pitch');
   const [copied, setCopied] = useState(false);
-  const [marking, setMarking] = useState(false);
+  const [marking, setMarking] = useState<string | null>(null);
+  const [currentStatus, setCurrentStatus] = useState(prospect.status);
 
   const industry = prospect.job?.industry ?? '';
   const city = prospect.city || prospect.job?.city || '';
@@ -72,17 +73,16 @@ Jonas`;
     setTimeout(() => setCopied(false), 1800);
   };
 
-  const markAsRingd = async () => {
-    if (prospect.status === 'Ringd') { onClose(); return; }
-    setMarking(true);
+  const setStatus = async (status: string) => {
+    setMarking(status);
+    setCurrentStatus(status);
     await fetch(`/api/prospects/${prospect.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'Ringd' }),
+      body: JSON.stringify({ status }),
     });
-    setMarking(false);
+    setMarking(null);
     onRefresh?.();
-    onClose();
   };
 
   const sc = scoreClass(prospect.priorityScore);
@@ -257,36 +257,52 @@ Jonas`;
           flexWrap: 'wrap',
         }}>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={copy}
-              style={ghostBtnStyle}
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/>
-              </svg>
-              {copied ? 'Kopierat!' : 'Kopiera'}
-            </button>
+            {mode !== 'email' && (
+              <button onClick={copy} style={ghostBtnStyle}>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/>
+                </svg>
+                {copied ? 'Kopierat!' : 'Kopiera'}
+              </button>
+            )}
           </div>
-          {mode !== 'email' && (
-            <button
-              onClick={markAsRingd}
-              disabled={marking}
-              style={{
-                background: 'var(--accent)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 'var(--r-pill)',
-                padding: '8px 18px',
-                fontSize: 14,
-                fontWeight: 500,
-                cursor: marking ? 'not-allowed' : 'pointer',
-                opacity: marking ? 0.7 : 1,
-                transition: 'background 0.15s',
-              }}
-            >
-              {mode === 'sms' ? 'Skicka SMS' : 'Markera som ringd'}
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {([
+              { status: 'Ringd',       label: 'Ringd',       bg: 'var(--accent-soft)',  color: 'var(--accent-text)', border: 'rgba(26,86,219,0.18)' },
+              { status: 'Intresserad', label: 'Intresserad', bg: 'var(--green-soft)',   color: 'var(--green)',       border: 'var(--green-border)' },
+              { status: 'Kund',        label: 'Kund',        bg: 'var(--purple-soft)',  color: 'var(--purple)',      border: 'var(--purple-border)' },
+              { status: 'Nej',         label: 'Ej intresserad', bg: 'var(--red-soft)', color: 'var(--red)',         border: 'var(--red-border)' },
+            ] as const).map(({ status, label, bg, color, border }) => {
+              const isActive = currentStatus === status;
+              const isLoading = marking === status;
+              return (
+                <button
+                  key={status}
+                  onClick={() => setStatus(status)}
+                  disabled={marking !== null}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '6px 12px',
+                    borderRadius: 'var(--r-pill)',
+                    fontSize: 13, fontWeight: 500,
+                    border: `1px solid ${isActive ? border : 'var(--border)'}`,
+                    background: isActive ? bg : 'var(--bg)',
+                    color: isActive ? color : 'var(--text-muted)',
+                    cursor: marking !== null ? 'not-allowed' : 'pointer',
+                    opacity: marking !== null && !isLoading ? 0.5 : 1,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {isActive && !isLoading && (
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2 6l3 3 5-5"/>
+                    </svg>
+                  )}
+                  {isLoading ? '…' : label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
