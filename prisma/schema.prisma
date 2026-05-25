@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ScrapeJob {
+  id          String    @id @default(cuid())
+  industry    String
+  city        String
+  maxResults  Int       @default(20)
+  status      String    @default("pending") // pending | running | completed | failed
+  progress    String?
+  error       String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+  prospects   Prospect[]
+}
+
+model Prospect {
+  id                 String    @id @default(cuid())
+  jobId              String
+  job                ScrapeJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  name               String
+  phone              String?
+  address            String?
+  city               String?
+  orgNumber          String?
+  revenue            Int?
+  employees          Int?
+  profitPositive     Boolean?
+  yearsInBusiness    Int?
+  googleReviewsCount Int?
+  googleRating       Float?
+  source             String?
+  priorityScore      Int       @default(0)
+  createdAt          DateTime  @default(now())
+}
