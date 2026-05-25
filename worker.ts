@@ -5,9 +5,9 @@ import type { ScrapeJobData } from './lib/queue';
 const { runScraper } = require('./scraper/index.js');
 
 const connection = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD || undefined,
+  host: process.env.REDIS_HOST || process.env.REDISHOST || 'localhost',
+  port: parseInt(process.env.REDIS_PORT || process.env.REDISPORT || '6379'),
+  password: process.env.REDIS_PASSWORD || process.env.REDISPASSWORD || undefined,
 };
 
 const worker = new Worker<ScrapeJobData>(
