@@ -23,15 +23,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     p.googleReviewsCount ?? '',
     p.source ?? '',
     p.priorityScore,
-  ]);
+  ] as (string | number)[]);
 
   const csv = [headers, ...rows]
-    .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    .map(row => row.map((v: string | number) => `"${String(v).replace(/"/g, '""')}"`).join(','))
     .join('\n');
 
   const filename = `prospects-${job.industry}-${job.city}-${job.createdAt.toISOString().split('T')[0]}.csv`;
 
-  return new Response(csv, {
+  return new Response('﻿' + csv, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="${filename}"`,
