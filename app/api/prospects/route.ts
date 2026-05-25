@@ -5,12 +5,16 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const search = searchParams.get('search') || '';
   const status = searchParams.get('status') || '';
+  const bransch = searchParams.get('bransch') || '';
+  const stad = searchParams.get('stad') || '';
   const page = parseInt(searchParams.get('page') || '1');
-  const limit = 25;
+  const limit = parseInt(searchParams.get('limit') || '25');
 
   const where = {
     ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
     ...(status && { status }),
+    ...(stad && { city: { contains: stad, mode: 'insensitive' as const } }),
+    ...(bransch && { job: { industry: { contains: bransch, mode: 'insensitive' as const } } }),
   };
 
   const [prospects, total] = await Promise.all([

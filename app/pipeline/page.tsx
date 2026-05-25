@@ -22,18 +22,10 @@ type Prospect = {
 
 const STAGES = ['Ny', 'Ringd', 'Intresserad', 'Kund', 'Nej'];
 
-const STAGE_STYLE: Record<string, { border: string; header: string; headerText: string }> = {
-  Ny:          { border: '#d1d5db', header: '#f3f4f6', headerText: '#374151' },
-  Ringd:       { border: '#bfdbfe', header: '#eff6ff', headerText: '#1d4ed8' },
-  Intresserad: { border: '#bbf7d0', header: '#f0fdf4', headerText: '#15803d' },
-  Kund:        { border: '#e9d5ff', header: '#faf5ff', headerText: '#7c3aed' },
-  Nej:         { border: '#fecaca', header: '#fef2f2', headerText: '#b91c1c' },
-};
-
-function scorePillStyle(score: number) {
-  if (score >= 70) return { bg: 'var(--good-bg)', color: 'var(--good)' };
-  if (score >= 40) return { bg: 'var(--warn-bg)', color: 'var(--warn)' };
-  return { bg: 'var(--bad-bg)', color: 'var(--bad)' };
+function scoreBadge(score: number) {
+  if (score >= 70) return { bg: 'var(--green-soft)', color: 'var(--green)', border: 'var(--green-border)' };
+  if (score >= 40) return { bg: 'var(--yellow-soft)', color: 'var(--yellow)', border: 'var(--yellow-border)' };
+  return { bg: 'var(--red-soft)', color: 'var(--red)', border: 'var(--red-border)' };
 }
 
 function daysSince(dateStr: string) {
@@ -43,7 +35,8 @@ function daysSince(dateStr: string) {
 export default function PipelinePage() {
   const [all, setAll] = useState<Prospect[]>([]);
   const [modal, setModal] = useState<Prospect | null>(null);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);
 
   const fetchAll = async () => {
     const res = await fetch('/api/prospects?page=1&limit=200');
@@ -54,81 +47,178 @@ export default function PipelinePage() {
   useEffect(() => { fetchAll(); }, []);
 
   const moveTo = async (id: string, status: string) => {
-    setUpdatingId(id);
+    setAll(prev => prev.map(p => p.id === id ? { ...p, status } : p));
     await fetch(`/api/prospects/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
-    setUpdatingId(null);
-    fetchAll();
   };
 
   const byStage = (stage: string) => all.filter(p => p.status === stage);
 
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData('text/plain', id);
+    setDragging(id);
+  };
+
+  const handleDragEnd = () => {
+    setDragging(null);
+    setDragOver(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, stage: string) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/plain');
+    const prospect = all.find(p => p.id === id);
+    if (prospect && prospect.status !== stage) {
+      moveTo(id, stage);
+    }
+    setDragOver(null);
+  };
+
   return (
-    <div style={{ padding: '40px 32px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontFamily: 'var(--font-hand)', fontWeight: 700, fontSize: 28, margin: 0 }}>Pipeline</h1>
-        <p style={{ color: 'var(--muted)', fontSize: 14, margin: '4px 0 0' }}>Håll koll på din prospektering — {all.length} totalt</p>
+    <div style={{ padding: '48px 32px 80px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ marginBottom: 36 }}>
+        <h1 style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.025em', margin: 0, lineHeight: 1.15 }}>Pipeline</h1>
+        <p style={{ color: 'var(--text-muted)', fontSize: 15, margin: '6px 0 0', letterSpacing: '-0.005em' }}>
+          Dra kort mellan kolumner för att uppdatera status. {all.length} prospects totalt.
+        </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, flex: 1, minHeight: 0, overflowX: 'auto' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 16, flex: 1, alignItems: 'start', overflowX: 'auto' }}>
         {STAGES.map(stage => {
           const cards = byStage(stage);
-          const st = STAGE_STYLE[stage];
+          const isOver = dragOver === stage;
           return (
-            <div key={stage} style={{ display: 'flex', flexDirection: 'column', minWidth: 180 }}>
-              <div style={{ background: st.header, border: `1.5px solid ${st.border}`, borderRadius: '10px 10px 0 0', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 700, fontSize: 13, color: st.headerText }}>{stage}</span>
-                <span style={{ background: 'rgba(0,0,0,0.08)', color: st.headerText, fontSize: 11, padding: '2px 8px', borderRadius: 12, fontWeight: 600 }}>{cards.length}</span>
+            <div
+              key={stage}
+              onDragOver={e => { e.preventDefault(); setDragOver(stage); }}
+              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(null); }}
+              onDrop={e => handleDrop(e, stage)}
+              style={{
+                background: isOver ? 'var(--accent-soft)' : 'var(--bg-subtle)',
+                border: `1px solid ${isOver ? 'var(--accent)' : 'var(--border)'}`,
+                borderRadius: 'var(--r-md)',
+                padding: 14,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                minHeight: 480,
+                transition: 'background 0.15s, border-color 0.15s',
+              }}
+            >
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '4px 6px 10px',
+                borderBottom: '1px solid var(--border)',
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{stage}</span>
+                <span style={{
+                  fontSize: 12, color: 'var(--text-muted)',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  padding: '1px 8px',
+                  borderRadius: 'var(--r-pill)',
+                  fontWeight: 500,
+                }}>
+                  {cards.length}
+                </span>
               </div>
-              <div style={{ flex: 1, border: `1.5px solid ${st.border}`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: 8, display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--bg-card)', overflowY: 'auto', maxHeight: 'calc(100vh - 240px)' }}>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                {cards.length === 0 && (
+                  <div style={{
+                    border: '1px dashed var(--border-strong)',
+                    borderRadius: 'var(--r-sm)',
+                    padding: '18px 12px',
+                    textAlign: 'center',
+                    color: 'var(--text-faint)',
+                    fontSize: 12,
+                  }}>
+                    Tomt
+                  </div>
+                )}
                 {cards.map(p => {
-                  const score = scorePillStyle(p.priorityScore);
+                  const sc = scoreBadge(p.priorityScore);
                   const days = daysSince(p.createdAt);
                   const followUp = days >= 3 && stage !== 'Kund' && stage !== 'Nej';
+                  const isDragging = dragging === p.id;
                   return (
-                    <div key={p.id} style={{ background: '#fff', border: '1.5px solid var(--border-soft)', borderRadius: 8, padding: '10px 12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                        <div style={{ fontFamily: 'var(--font-hand)', fontWeight: 700, fontSize: 14, flex: 1, marginRight: 6, lineHeight: 1.3 }}>{p.name}</div>
-                        <span style={{ background: score.bg, color: score.color, fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 12, flexShrink: 0 }}>{p.priorityScore}</span>
+                    <div
+                      key={p.id}
+                      draggable
+                      onDragStart={e => handleDragStart(e, p.id)}
+                      onDragEnd={handleDragEnd}
+                      onClick={() => setModal(p)}
+                      style={{
+                        background: 'var(--bg)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--r-sm)',
+                        padding: 12,
+                        boxShadow: 'var(--shadow-sm)',
+                        cursor: 'grab',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                        opacity: isDragging ? 0.4 : 1,
+                        transition: 'box-shadow 0.15s, transform 0.15s, border-color 0.15s, opacity 0.15s',
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)';
+                        (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)';
+                        (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-sm)';
+                        (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
+                        (e.currentTarget as HTMLElement).style.transform = '';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                          {p.name}
+                        </span>
+                        <span style={{
+                          background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`,
+                          fontSize: 12, fontWeight: 600, padding: '2px 6px', borderRadius: 'var(--r-pill)',
+                          flexShrink: 0, fontVariantNumeric: 'tabular-nums',
+                        }}>
+                          {p.priorityScore}
+                        </span>
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{p.city || p.job.city}</div>
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ fontSize: 11, color: 'var(--muted)' }}>{days === 0 ? 'idag' : `${days}d sedan`}</span>
-                          {followUp && <span style={{ background: 'var(--bad-bg)', color: 'var(--bad)', fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600 }}>Följ upp</span>}
-                        </div>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button
-                            onClick={() => setModal(p)}
-                            style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1.5px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', color: 'var(--ink-soft)' }}
-                          >Kontakt</button>
-                          <select
-                            value={p.status}
-                            disabled={updatingId === p.id}
-                            onChange={e => moveTo(p.id, e.target.value)}
-                            style={{ fontSize: 11, padding: '3px 6px', borderRadius: 6, border: '1.5px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', color: 'var(--ink-soft)', outline: 'none' }}
-                          >
-                            {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)' }}>
+                        <span>{p.city || p.job.city}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)' }}>
+                        <span>{days === 0 ? 'idag' : `${days} d sedan`}</span>
+                        {followUp && (
+                          <span style={{
+                            fontSize: 11, fontWeight: 600,
+                            color: 'var(--red)', background: 'var(--red-soft)',
+                            border: '1px solid var(--red-border)',
+                            padding: '1px 7px', borderRadius: 'var(--r-pill)',
+                          }}>
+                            Följ upp
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
                 })}
-                {cards.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: 12, fontFamily: 'var(--font-hand)' }}>— tomt —</div>
-                )}
               </div>
             </div>
           );
         })}
       </div>
 
-      {modal && <ContactModal prospect={modal} onClose={() => setModal(null)} />}
+      {modal && (
+        <ContactModal
+          prospect={modal}
+          onClose={() => setModal(null)}
+          onRefresh={fetchAll}
+        />
+      )}
     </div>
   );
 }

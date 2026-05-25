@@ -15,17 +15,22 @@ type Job = {
   _count: { prospects: number };
 };
 
-const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  pending:   { bg: 'var(--warn-bg)',  color: 'var(--warn)',  label: 'Väntar' },
-  running:   { bg: 'var(--accent-bg)', color: 'var(--accent)', label: 'Kör...' },
-  completed: { bg: 'var(--good-bg)',  color: 'var(--good)',  label: 'Klar' },
-  failed:    { bg: 'var(--bad-bg)',   color: 'var(--bad)',   label: 'Misslyckades' },
+const STATUS_STYLE: Record<string, { bg: string; color: string; border: string; label: string }> = {
+  pending:   { bg: 'var(--yellow-soft)', color: 'var(--yellow)', border: 'var(--yellow-border)', label: 'Väntar' },
+  running:   { bg: 'var(--accent-soft)', color: 'var(--accent)', border: 'rgba(26,86,219,0.18)', label: 'Kör...' },
+  completed: { bg: 'var(--green-soft)', color: 'var(--green)', border: 'var(--green-border)', label: 'Klar' },
+  failed:    { bg: 'var(--red-soft)', color: 'var(--red)', border: 'var(--red-border)', label: 'Misslyckades' },
 };
 
 function Pill({ status }: { status: string }) {
-  const s = STATUS_STYLE[status] ?? { bg: '#eee', color: '#666', label: status };
+  const s = STATUS_STYLE[status] ?? { bg: '#f0f0f3', color: '#4b5563', border: 'rgba(0,0,0,0.06)', label: status };
   return (
-    <span style={{ background: s.bg, color: s.color, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>
+    <span style={{
+      background: s.bg, color: s.color,
+      border: `1px solid ${s.border}`,
+      fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 'var(--r-pill)',
+      whiteSpace: 'nowrap',
+    }}>
       {s.label}
     </span>
   );
@@ -71,125 +76,220 @@ export default function SokPage() {
   const lastProgressLine = activeJob?.progress?.split('\n').filter(Boolean).slice(-1)[0] ?? '';
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', padding: '40px 32px' }}>
-      <h1 style={{ fontFamily: 'var(--font-hand)', fontWeight: 700, fontSize: 28, marginBottom: 4 }}>Sök prospects</h1>
-      <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 28 }}>Hitta företag utan hemsida via hitta.se och Google Maps</p>
+    <div style={{ maxWidth: 760, margin: '0 auto', padding: '48px 56px 80px' }}>
+      <header style={{ marginBottom: 36 }}>
+        <h1 style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.025em', margin: 0, lineHeight: 1.15 }}>Sök prospects</h1>
+        <p style={{ color: 'var(--text-muted)', fontSize: 15, margin: '6px 0 0', letterSpacing: '-0.005em' }}>
+          Skrapa hitta.se efter företag som matchar dina kriterier.
+        </p>
+      </header>
 
-      <div style={{ background: 'var(--bg-card)', border: '1.5px solid var(--border)', borderRadius: 12, padding: 24, marginBottom: 20 }}>
+      <div style={{
+        background: 'var(--bg)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--r-lg)',
+        boxShadow: 'var(--shadow-md)',
+        padding: 24,
+        marginBottom: 20,
+      }}>
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 0.6fr auto', gap: 14, alignItems: 'flex-end' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bransch</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 0.7fr auto', gap: 16, alignItems: 'flex-end' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>Bransch</label>
               <input
                 value={industry}
                 onChange={e => setIndustry(e.target.value)}
                 placeholder="t.ex. däckverkstad"
                 required
-                style={{ width: '100%', border: '1.5px solid var(--border)', borderRadius: 8, padding: '9px 12px', fontSize: 14, background: 'var(--bg)', color: 'var(--ink)', outline: 'none', boxSizing: 'border-box' }}
+                style={inputStyle}
               />
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Stad</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>Stad</label>
               <input
                 value={city}
                 onChange={e => setCity(e.target.value)}
                 placeholder="t.ex. Göteborg"
                 required
-                style={{ width: '100%', border: '1.5px solid var(--border)', borderRadius: 8, padding: '9px 12px', fontSize: 14, background: 'var(--bg)', color: 'var(--ink)', outline: 'none', boxSizing: 'border-box' }}
+                style={inputStyle}
               />
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Max</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>Max antal</label>
               <input
                 type="number"
                 value={maxResults}
                 onChange={e => setMaxResults(Number(e.target.value))}
                 min={5} max={50}
-                style={{ width: '100%', border: '1.5px solid var(--border)', borderRadius: 8, padding: '9px 12px', fontSize: 14, background: 'var(--bg)', color: 'var(--ink)', outline: 'none', boxSizing: 'border-box' }}
+                style={inputStyle}
               />
             </div>
             <button
               type="submit"
               disabled={loading}
               style={{
-                background: 'var(--accent)', color: '#fff', border: 'none',
-                borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 600,
-                cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1,
+                height: 42,
+                background: loading ? 'var(--accent-hover)' : 'var(--accent)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 'var(--r-pill)',
+                padding: '0 20px',
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: loading ? 'not-allowed' : 'pointer',
                 whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                opacity: loading ? 0.7 : 1,
+                transition: 'background 0.15s',
               }}
             >
-              {loading ? 'Startar...' : 'Hitta prospects →'}
+              {loading ? 'Startar…' : 'Hitta prospects'}
+              {!loading && (
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 8h10M9 4l4 4-4 4"/>
+                </svg>
+              )}
             </button>
           </div>
         </form>
       </div>
 
       {activeJob && (activeJob.status === 'running' || activeJob.status === 'pending') && (
-        <div style={{ background: 'var(--accent-bg)', border: '1.5px dashed var(--accent)', borderRadius: 10, padding: '14px 18px', marginBottom: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>Scrapar {activeJob.industry} i {activeJob.city}…</span>
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>uppdateras var 4:e sek</span>
+        <div style={{
+          padding: '16px 20px',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--r-md)',
+          background: 'var(--bg-subtle)',
+          marginBottom: 20,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ width: 14, height: 14, border: '2px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+              <span style={{ fontWeight: 500 }}>Scrapar {activeJob.industry} i {activeJob.city}…</span>
+            </div>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>uppdateras var 4:e sek</span>
           </div>
-          <div style={{ height: 8, background: 'var(--border-soft)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
-            <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 4, width: activeJob.status === 'running' ? '60%' : '15%', transition: 'width 1s' }} />
+          <div style={{ height: 6, background: 'var(--bg)', borderRadius: 'var(--r-pill)', overflow: 'hidden', border: '1px solid var(--border)' }}>
+            <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 'var(--r-pill)', width: activeJob.status === 'running' ? '60%' : '15%', transition: 'width 1s' }} />
           </div>
           {lastProgressLine && (
-            <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontFamily: 'var(--font-hand)' }}>{lastProgressLine}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>{lastProgressLine}</div>
           )}
         </div>
       )}
 
       {activeJob?.status === 'completed' && (
-        <div style={{ background: 'var(--good-bg)', border: '1.5px solid var(--good)', borderRadius: 10, padding: '14px 18px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontFamily: 'var(--font-hand)', fontWeight: 700, fontSize: 15 }}>✓ Lade till {activeJob._count.prospects} nya prospects</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{activeJob.industry} · {activeJob.city}</div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 14,
+          marginBottom: 20,
+          padding: '16px 20px',
+          background: 'var(--green-soft)',
+          border: `1px solid var(--green-border)`,
+          borderRadius: 'var(--r-md)',
+        }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: '50%',
+            background: 'var(--green)', color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 8l3.5 3.5L13 5"/>
+            </svg>
           </div>
-          <Link href="/prospects" style={{ background: 'var(--good)', color: '#fff', textDecoration: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
-            Visa lista →
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600 }}>Lade till {activeJob._count.prospects} nya prospects</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{activeJob.industry} · {activeJob.city}</div>
+          </div>
+          <Link href="/prospects" style={{
+            background: 'var(--green)', color: '#fff', textDecoration: 'none',
+            padding: '5px 14px', borderRadius: 'var(--r-pill)', fontSize: 13, fontWeight: 500,
+          }}>
+            Visa lista
           </Link>
         </div>
       )}
 
       {activeJob?.status === 'failed' && (
-        <div style={{ background: 'var(--bad-bg)', border: '1.5px solid var(--bad)', borderRadius: 10, padding: '14px 18px', marginBottom: 20 }}>
-          <div style={{ fontWeight: 600, color: 'var(--bad)', marginBottom: 4 }}>Scraping misslyckades</div>
-          <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{activeJob.progress?.split('\n').slice(-1)[0]}</div>
+        <div style={{
+          background: 'var(--red-soft)', border: `1px solid var(--red-border)`,
+          borderRadius: 'var(--r-md)', padding: '16px 20px', marginBottom: 20,
+        }}>
+          <div style={{ fontWeight: 600, color: 'var(--red)', marginBottom: 4 }}>Scraping misslyckades</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{activeJob.progress?.split('\n').slice(-1)[0]}</div>
         </div>
       )}
 
-      <div>
-        <h2 style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)', marginBottom: 12 }}>Senaste körningar</h2>
-        {jobs.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--muted)', fontSize: 14 }}>Inga körningar än</div>
-        )}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {jobs.map(job => (
-            <Link
-              key={job.id}
-              href={`/jobs/${job.id}`}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                background: 'var(--bg-card)', border: '1.5px solid var(--border)',
-                borderRadius: 10, padding: '14px 18px', textDecoration: 'none', color: 'var(--ink)',
-              }}
-            >
-              <div>
-                <div style={{ fontFamily: 'var(--font-hand)', fontWeight: 700, fontSize: 15 }}>{job.industry} — {job.city}</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                  {new Date(job.createdAt).toLocaleString('sv-SE')}
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {job.status === 'completed' && (
-                  <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{job._count.prospects} prospects</span>
-                )}
-                <Pill status={job.status} />
-              </div>
-            </Link>
-          ))}
+      {!activeJobId && jobs.length === 0 && (
+        <div style={{
+          border: '1px dashed var(--border-strong)',
+          borderRadius: 'var(--r-md)',
+          padding: '48px 32px',
+          textAlign: 'center',
+          color: 'var(--text-muted)',
+          background: 'var(--bg-subtle)',
+        }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>Inga sökningar än</div>
+          <p style={{ margin: 0, fontSize: 14 }}>Fyll i fälten ovan och kör en sökning.</p>
         </div>
-      </div>
+      )}
+
+      {jobs.length > 0 && (
+        <div>
+          <h2 style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 12, fontWeight: 600 }}>
+            Senaste körningar
+          </h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {jobs.map(job => (
+              <Link
+                key={job.id}
+                href={`/jobs/${job.id}`}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-md)',
+                  padding: '14px 18px',
+                  textDecoration: 'none',
+                  color: 'var(--text)',
+                  boxShadow: 'var(--shadow-sm)',
+                  transition: 'box-shadow 0.15s',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>{job.industry} — {job.city}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                    {new Date(job.createdAt).toLocaleString('sv-SE')}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {job.status === 'completed' && (
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{job._count.prospects} prospects</span>
+                  )}
+                  <Pill status={job.status} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
+
+const inputStyle: React.CSSProperties = {
+  height: 42,
+  padding: '0 14px',
+  border: '1px solid var(--border)',
+  borderRadius: 10,
+  background: 'var(--bg)',
+  fontSize: 14,
+  color: 'var(--text)',
+  outline: 'none',
+  width: '100%',
+  letterSpacing: '-0.005em',
+  transition: 'border-color 0.15s, box-shadow 0.15s',
+};

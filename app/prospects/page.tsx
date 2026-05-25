@@ -21,18 +21,21 @@ type Prospect = {
 
 const STATUSES = ['Ny', 'Ringd', 'Intresserad', 'Kund', 'Nej'];
 
-const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
-  Ny:          { bg: '#f3f4f6', color: '#374151' },
-  Ringd:       { bg: 'var(--accent-bg)', color: 'var(--accent)' },
-  Intresserad: { bg: 'var(--good-bg)', color: 'var(--good)' },
-  Kund:        { bg: '#f3e8ff', color: '#7c3aed' },
-  Nej:         { bg: 'var(--bad-bg)', color: 'var(--bad)' },
-};
+function scoreBadge(score: number) {
+  if (score >= 70) return { bg: 'var(--green-soft)', color: 'var(--green)', border: 'var(--green-border)' };
+  if (score >= 40) return { bg: 'var(--yellow-soft)', color: 'var(--yellow)', border: 'var(--yellow-border)' };
+  return { bg: 'var(--red-soft)', color: 'var(--red)', border: 'var(--red-border)' };
+}
 
-function scorePillStyle(score: number) {
-  if (score >= 70) return { bg: 'var(--good-bg)', color: 'var(--good)' };
-  if (score >= 40) return { bg: 'var(--warn-bg)', color: 'var(--warn)' };
-  return { bg: 'var(--bad-bg)', color: 'var(--bad)' };
+function statusPill(status: string) {
+  const map: Record<string, { bg: string; color: string; border: string }> = {
+    Ny:          { bg: '#f0f0f3', color: '#4b5563', border: 'rgba(0,0,0,0.06)' },
+    Ringd:       { bg: 'var(--accent-soft)', color: 'var(--accent-text)', border: 'rgba(26,86,219,0.18)' },
+    Intresserad: { bg: 'var(--green-soft)', color: 'var(--green)', border: 'var(--green-border)' },
+    Kund:        { bg: 'var(--purple-soft)', color: 'var(--purple)', border: 'var(--purple-border)' },
+    Nej:         { bg: 'var(--red-soft)', color: 'var(--red)', border: 'var(--red-border)' },
+  };
+  return map[status] ?? { bg: '#f0f0f3', color: '#4b5563', border: 'rgba(0,0,0,0.06)' };
 }
 
 export default function ProspectsPage() {
@@ -43,133 +46,333 @@ export default function ProspectsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [modal, setModal] = useState<Prospect | null>(null);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [industries, setIndustries] = useState<string[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
+  const [industryFilter, setIndustryFilter] = useState('');
+  const [cityFilter, setCityFilter] = useState('');
 
   const fetchProspects = useCallback(async () => {
     const params = new URLSearchParams({ page: String(page) });
     if (search) params.set('search', search);
     if (statusFilter) params.set('status', statusFilter);
+    if (industryFilter) params.set('bransch', industryFilter);
+    if (cityFilter) params.set('stad', cityFilter);
     const res = await fetch(`/api/prospects?${params}`);
     const data = await res.json();
     setProspects(data.prospects ?? []);
     setTotal(data.total ?? 0);
     setTotalPages(data.totalPages ?? 1);
-  }, [page, search, statusFilter]);
+  }, [page, search, statusFilter, industryFilter, cityFilter]);
 
   useEffect(() => { fetchProspects(); }, [fetchProspects]);
 
-  const updateStatus = async (id: string, status: string) => {
-    setUpdatingId(id);
-    await fetch(`/api/prospects/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
+  useEffect(() => {
+    fetch('/api/filter-options').then(r => r.json()).then(d => {
+      setIndustries(d.industries ?? []);
+      setCities(d.cities ?? []);
     });
-    setUpdatingId(null);
-    fetchProspects();
+  }, []);
+
+  const toggleExpand = (id: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
   return (
-    <div style={{ padding: '40px 32px', maxWidth: 1100 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 6 }}>
+    <div style={{ padding: '48px 56px 80px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 36, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontFamily: 'var(--font-hand)', fontWeight: 700, fontSize: 28, margin: 0 }}>Prospects</h1>
-          <p style={{ color: 'var(--muted)', fontSize: 14, margin: '4px 0 0' }}>{total} företag totalt</p>
+          <h1 style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.025em', margin: 0, lineHeight: 1.15 }}>Prospects</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: 15, margin: '6px 0 0', letterSpacing: '-0.005em' }}>
+            {total} företag · klicka en rad för att se detaljer
+          </p>
         </div>
       </div>
 
-      <div style={{ background: 'var(--bg-card)', border: '1.5px dashed var(--border)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input
-          value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1); }}
-          placeholder="Sök på namn…"
-          style={{ flex: 1, minWidth: 200, border: '1.5px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 14, background: 'var(--bg)', color: 'var(--ink)', outline: 'none' }}
-        />
-        <select
-          value={statusFilter}
-          onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
-          style={{ border: '1.5px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 14, background: 'var(--bg)', color: statusFilter ? 'var(--ink)' : 'var(--muted)', outline: 'none' }}
-        >
+      {/* Filter bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: 14, flexWrap: 'wrap',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--r-md)',
+        background: 'var(--bg-subtle)',
+        marginBottom: 20,
+      }}>
+        {industries.length > 0 && (
+          <select value={industryFilter} onChange={e => { setIndustryFilter(e.target.value); setPage(1); }} style={selectStyle}>
+            <option value="">Bransch: alla</option>
+            {industries.map(i => <option key={i} value={i}>{i}</option>)}
+          </select>
+        )}
+        {cities.length > 0 && (
+          <select value={cityFilter} onChange={e => { setCityFilter(e.target.value); setPage(1); }} style={selectStyle}>
+            <option value="">Stad: alla</option>
+            {cities.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }} style={selectStyle}>
           <option value="">Status: alla</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
+        <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+            style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', pointerEvents: 'none' }}>
+            <circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/>
+          </svg>
+          <input
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Sök på namn…"
+            style={{ ...inputStyle, paddingLeft: 36 }}
+          />
+        </div>
       </div>
 
-      <div style={{ background: 'var(--bg-card)', border: '1.5px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+      {/* Table */}
+      <div style={{
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--r-md)',
+        overflow: 'hidden',
+        background: 'var(--bg)',
+        boxShadow: 'var(--shadow-md)',
+      }}>
+        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 14 }}>
           <thead>
-            <tr style={{ borderBottom: '1.5px solid var(--border)', background: 'var(--bg)' }}>
+            <tr>
+              <th style={{ ...thStyle, width: 32 }}></th>
               {['Namn', 'Stad', 'Anst.', 'Score', 'Status', 'Åtgärder'].map(h => (
-                <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)', fontWeight: 600 }}>{h}</th>
+                <th key={h} style={thStyle}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {prospects.length === 0 && (
-              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>Inga prospects hittades</td></tr>
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)' }}>
+                  <div style={{ fontWeight: 500, color: 'var(--text)', marginBottom: 4 }}>Inga prospects matchar dina filter</div>
+                  <div style={{ fontSize: 13 }}>Prova att rensa filtren eller justera söktermen.</div>
+                </td>
+              </tr>
             )}
-            {prospects.map((p, i) => {
-              const score = scorePillStyle(p.priorityScore);
-              const st = STATUS_STYLE[p.status] ?? { bg: '#eee', color: '#666' };
+            {prospects.map((p) => {
+              const sc = scoreBadge(p.priorityScore);
+              const sp = statusPill(p.status);
+              const isOpen = expanded.has(p.id);
               return (
-                <tr key={p.id} style={{ borderBottom: i < prospects.length - 1 ? '1px solid var(--border-soft)' : 'none' }}>
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ fontFamily: 'var(--font-hand)', fontWeight: 700, fontSize: 15 }}>{p.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>{p.job.industry}</div>
-                  </td>
-                  <td style={{ padding: '12px 16px', color: 'var(--ink-soft)' }}>{p.city || p.job.city}</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--ink-soft)' }}>{p.employees ?? '—'}</td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <span style={{ background: score.bg, color: score.color, fontSize: 12, fontWeight: 700, padding: '3px 9px', borderRadius: 20 }}>{p.priorityScore}</span>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <select
-                      value={p.status}
-                      disabled={updatingId === p.id}
-                      onChange={e => updateStatus(p.id, e.target.value)}
-                      style={{ background: st.bg, color: st.color, border: 'none', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', outline: 'none' }}
-                    >
-                      {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <button
-                      onClick={() => setModal(p)}
-                      style={{ background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 7, padding: '5px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--ink-soft)' }}
-                    >
-                      Kontakt
-                    </button>
-                  </td>
-                </tr>
+                <>
+                  <tr
+                    key={p.id}
+                    onClick={() => toggleExpand(p.id)}
+                    style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.1s' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-subtle)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '')}
+                  >
+                    <td style={{ padding: '14px 16px', verticalAlign: 'middle' }}>
+                      <svg
+                        width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                        style={{ color: 'var(--text-faint)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.18s', display: 'block' }}
+                      >
+                        <path d="m5 3 4 4-4 4"/>
+                      </svg>
+                    </td>
+                    <td style={{ padding: '14px 16px', verticalAlign: 'middle' }}>
+                      <div style={{ fontWeight: 600 }}>{p.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>{p.job.industry}</div>
+                    </td>
+                    <td style={{ padding: '14px 16px', color: 'var(--text-muted)', verticalAlign: 'middle' }}>{p.city || p.job.city}</td>
+                    <td style={{ padding: '14px 16px', color: 'var(--text-muted)', verticalAlign: 'middle' }}>{p.employees ?? '—'}</td>
+                    <td style={{ padding: '14px 16px', verticalAlign: 'middle' }}>
+                      <span style={{
+                        background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`,
+                        fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 'var(--r-pill)',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}>
+                        {p.priorityScore}
+                      </span>
+                    </td>
+                    <td style={{ padding: '14px 16px', verticalAlign: 'middle' }}>
+                      <span style={{
+                        background: sp.bg, color: sp.color, border: `1px solid ${sp.border}`,
+                        fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 'var(--r-pill)',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {p.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '14px 16px', verticalAlign: 'middle' }}>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => setModal(p)}
+                          style={actionBtnStyle}
+                        >
+                          Kontakt
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {isOpen && (
+                    <tr key={`${p.id}-expand`} style={{ background: 'var(--bg-subtle)' }}>
+                      <td></td>
+                      <td colSpan={6}>
+                        <div style={{ padding: '20px 0 24px', borderTop: '1px solid var(--border)' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 32, paddingRight: 24 }}>
+                            <div>
+                              <h4 style={detailHeadStyle}>Företagsinfo</h4>
+                              <dl>
+                                <DetailRow label="Org.nr" value={p.orgNumber || '—'} />
+                                <DetailRow label="Bransch" value={p.job.industry} />
+                                <DetailRow label="Adress" value={p.address || '—'} />
+                              </dl>
+                            </div>
+                            <div>
+                              <h4 style={detailHeadStyle}>Ekonomi</h4>
+                              <dl>
+                                <DetailRow label="Omsättning" value={p.revenue ? `${(p.revenue / 1000000).toFixed(1)} MSEK` : '—'} />
+                                <DetailRow label="Anställda" value={p.employees != null ? String(p.employees) : '—'} />
+                                <DetailRow label="Google" value={p.googleRating ? `${p.googleRating} ★` : '—'} />
+                              </dl>
+                            </div>
+                            <div>
+                              <h4 style={detailHeadStyle}>Kontakt</h4>
+                              <dl>
+                                <DetailRow label="Telefon" value={p.phone || '—'} link={p.phone ? `tel:${p.phone}` : undefined} />
+                                <DetailRow label="Källa" value={p.source || '—'} />
+                              </dl>
+                              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                                <button onClick={() => setModal(p)} style={{ ...actionBtnStyle, background: 'var(--accent)', color: '#fff', border: 'none' }}>
+                                  Öppna kontakt
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
               );
             })}
           </tbody>
         </table>
       </div>
 
+      {/* Pagination */}
       {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
-          <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, flexWrap: 'wrap', gap: 12 }}>
+          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
             Visar {(page - 1) * 25 + 1}–{Math.min(page * 25, total)} av {total}
           </span>
           <div style={{ display: 'flex', gap: 4 }}>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <button
-                key={p}
-                onClick={() => setPage(p)}
-                style={{
-                  width: 32, height: 32, borderRadius: 7, border: '1.5px solid var(--border)',
-                  background: p === page ? 'var(--accent)' : 'var(--bg-card)',
-                  color: p === page ? '#fff' : 'var(--ink)',
-                  fontSize: 13, cursor: 'pointer', fontWeight: p === page ? 600 : 400,
-                }}
-              >{p}</button>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={pageBtnStyle(false)}>‹</button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).slice(Math.max(0, page - 3), page + 2).map(p => (
+              <button key={p} onClick={() => setPage(p)} style={pageBtnStyle(p === page)}>{p}</button>
             ))}
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={pageBtnStyle(false)}>›</button>
           </div>
         </div>
       )}
 
-      {modal && <ContactModal prospect={modal} onClose={() => setModal(null)} />}
+      {modal && (
+        <ContactModal
+          prospect={modal}
+          onClose={() => setModal(null)}
+          onRefresh={fetchProspects}
+        />
+      )}
     </div>
   );
 }
+
+function DetailRow({ label, value, link }: { label: string; value: string; link?: string }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: 12, padding: '6px 0', fontSize: 13 }}>
+      <dt style={{ color: 'var(--text-muted)' }}>{label}</dt>
+      <dd style={{ margin: 0, fontWeight: 500 }}>
+        {link ? <a href={link} style={{ color: 'var(--accent)', textDecoration: 'none' }}>{value}</a> : value}
+      </dd>
+    </div>
+  );
+}
+
+const thStyle: React.CSSProperties = {
+  textAlign: 'left',
+  padding: '12px 16px',
+  background: 'var(--bg-subtle)',
+  fontSize: 12,
+  fontWeight: 600,
+  color: 'var(--text-muted)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  borderBottom: '1px solid var(--border)',
+  whiteSpace: 'nowrap',
+};
+
+const detailHeadStyle: React.CSSProperties = {
+  fontSize: 11,
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  color: 'var(--text-muted)',
+  margin: '0 0 12px',
+  fontWeight: 600,
+  paddingBottom: 8,
+  borderBottom: '1px solid var(--border)',
+};
+
+const inputStyle: React.CSSProperties = {
+  height: 42,
+  padding: '0 14px',
+  border: '1px solid var(--border)',
+  borderRadius: 10,
+  background: 'var(--bg)',
+  fontSize: 14,
+  color: 'var(--text)',
+  outline: 'none',
+  width: '100%',
+  letterSpacing: '-0.005em',
+};
+
+const selectStyle: React.CSSProperties = {
+  height: 42,
+  padding: '0 32px 0 14px',
+  border: '1px solid var(--border)',
+  borderRadius: 10,
+  background: 'var(--bg)',
+  fontSize: 14,
+  color: 'var(--text)',
+  outline: 'none',
+  cursor: 'pointer',
+  minWidth: 160,
+  appearance: 'none',
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 12px center',
+};
+
+const actionBtnStyle: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  padding: '5px 12px',
+  borderRadius: 'var(--r-pill)',
+  fontSize: 13, fontWeight: 500,
+  border: '1px solid var(--border)',
+  background: 'var(--bg-muted)',
+  color: 'var(--text)',
+  cursor: 'pointer',
+  transition: 'background 0.15s',
+  whiteSpace: 'nowrap',
+};
+
+const pageBtnStyle = (active: boolean): React.CSSProperties => ({
+  minWidth: 32, height: 32,
+  padding: '0 10px',
+  border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+  background: active ? 'var(--accent)' : 'var(--bg)',
+  color: active ? '#fff' : 'var(--text)',
+  borderRadius: 'var(--r-sm)',
+  fontSize: 13, fontWeight: active ? 600 : 400,
+  cursor: 'pointer',
+  transition: 'background 0.12s, border-color 0.12s',
+});
