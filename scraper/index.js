@@ -211,6 +211,7 @@ async function scrapeHitta(browser, industry, city, maxResults) {
           category: item.category,
           org_number: item.orgNumber,
           has_website: false,
+          detail_url: item.detailUrl,
           source: 'hitta',
         });
         log(`  + ${item.name}${item.category ? ` [${item.category}]` : ''} (${parseRevealPhone(item.phoneHref) || 'inget tel'})`);
@@ -371,6 +372,64 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
   await page.close();
   log(`Google Maps klart: ${googleProspects.length} nya prospects, ${confirmedHasWebsite.size} hitta-bolag bekräftade med hemsida`);
   return { googleProspects, confirmedHasWebsite };
+}
+
+// ─── Hitta.se Detail Page Verification ───────────────────────────────────────
+
+async function verifyHittaDetails(browser, candidates) {
+  const toCheck = candidates.filter(c => c.detail_url);
+  if (toCheck.length === 0) return candidates;
+
+  log(`\nDetaljverifiering: ${toCheck.length} hitta.se-sidor...`);
+
+  const page = await browser.newPage();
+  await page.setUserAgent(randomUA());
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.setRequestInterception(true);
+  page.on('request', req => {
+    if (['image', 'font', 'media'].includes(req.resourceType())) req.abort();
+    else req.continue();
+  });
+
+  const hasWebsiteSet = new Set();
+
+  for (const biz of toCheck) {
+    try {
+      await page.goto(biz.detail_url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      await delay(700);
+
+      const found = await page.evaluate(() => {
+        const text = document.body.innerText;
+        // "Hemsida: www.xxx.se" or "Webbplats: https://..."
+        if (/hemsida\s*:?\s*(https?:\/\/|www\.)/i.test(text)) return true;
+        if (/webbplats\s*:?\s*(https?:\/\/|www\.)/i.test(text)) return true;
+        // Explicit aria-label or title on website link elements
+        if (document.querySelector(
+          'a[aria-label*="hemsida"], a[aria-label*="webbplats"], ' +
+          'a[title*="hemsida"], a[title*="webbplats"]'
+        )) return true;
+        // www. pattern appearing near "hemsida" keyword
+        const idx = text.toLowerCase().indexOf('hemsida');
+        if (idx !== -1 && /www\.[a-z0-9-]+\.[a-z]{2,}/i.test(text.slice(idx, idx + 200))) return true;
+        return false;
+      });
+
+      if (found) {
+        hasWebsiteSet.add(normalize(biz.name));
+        log(`  ✗ ${biz.name} — hemsida på detaljsida`);
+      } else {
+        log(`  ✓ ${biz.name} — ingen hemsida bekräftad`);
+      }
+    } catch (err) {
+      log(`  ? ${biz.name} — verifieringsfel: ${err.message.split('\n')[0]}`);
+    }
+    await delay(900 + Math.random() * 400);
+  }
+
+  await page.close();
+  const filtered = candidates.filter(c => !hasWebsiteSet.has(normalize(c.name)));
+  log(`Detaljverifiering klar: ${hasWebsiteSet.size} extra borttagna, ${filtered.length} av ${candidates.length} kvar`);
+  return filtered;
 }
 
 // ─── Allabolag.se Enrichment ──────────────────────────────────────────────────
@@ -552,12 +611,24 @@ async function enrichWithAllabolag(browser, businesses) {
           }
         } catch {}
 
-        return { revenue, employees, profit_positive: profitPositive, founding_year: foundingYear };
+        // Website check — if allabolag lists a website URL for the company, they have one
+        let websiteFound = false;
+        const webIdx = text.search(/webbplats|hemsida/i);
+        if (webIdx !== -1) {
+          const webSlice = text.slice(webIdx, webIdx + 200);
+          websiteFound = /https?:\/\/[^\s\n]+|www\.[a-z0-9-]+\.[a-z]{2,}/i.test(webSlice);
+        }
+
+        return { revenue, employees, profit_positive: profitPositive, founding_year: foundingYear, website_found: websiteFound };
       });
 
       const yearsInBusiness = fin.founding_year > 1900
         ? new Date().getFullYear() - fin.founding_year
         : 0;
+
+      if (fin.website_found) {
+        log(`    → ⚠ Webbplats registrerad på allabolag — filtreras`);
+      }
 
       enriched.push({
         ...biz,
@@ -565,6 +636,7 @@ async function enrichWithAllabolag(browser, businesses) {
         employees: fin.employees || biz.employees || 0,
         profit_positive: fin.profit_positive,
         years_in_business: yearsInBusiness,
+        website_found: fin.website_found,
       });
 
       log(
@@ -729,7 +801,10 @@ async function runScraper({ industry, city, maxResults = 20, onProgress = () => 
     }
     const filteredHitta = hittaResults.filter(h => !confirmedHasWebsite.has(normalize(h.name)));
 
-    const merged = mergeResults(filteredHitta, googleProspects);
+    // Pass 2: visit hitta.se detail pages for remaining candidates
+    const verifiedHitta = await verifyHittaDetails(browser, filteredHitta);
+
+    const merged = mergeResults(verifiedHitta, googleProspects);
 
     if (merged.length === 0) {
       log('Inga företag hittades utan hemsida.');
@@ -738,8 +813,17 @@ async function runScraper({ industry, city, maxResults = 20, onProgress = () => 
 
     const enriched = await enrichWithAllabolag(browser, merged);
 
+    // Filter out any prospect where allabolag confirmed a website (pass 3)
+    const enrichedFiltered = enriched.filter(b => {
+      if (b.website_found) {
+        log(`  ✗ ${b.name} — webbplats bekräftad på allabolag, tas bort`);
+        return false;
+      }
+      return true;
+    });
+
     log('Beräknar prioritetspoäng...');
-    const scored = enriched.map(b => ({ ...b, priority_score: calculateScore(b) }));
+    const scored = enrichedFiltered.map(b => ({ ...b, priority_score: calculateScore(b) }));
     scored.sort((a, b) => b.priority_score - a.priority_score);
 
     // Return only the top N after scoring across all candidates
