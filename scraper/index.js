@@ -3,14 +3,20 @@ const Anthropic = require('@anthropic-ai/sdk');
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-async function haikusHasWebsite(pageText, companyName) {
+async function haikusHasWebsite(pageText, companyName, source = 'hitta') {
   try {
+    const context = source === 'maps'
+      ? `Google Maps-sidan för "${companyName}"`
+      : `hitta.se-sidan för "${companyName}"`;
+    const ignoreNote = source === 'maps'
+      ? 'Ignorera Google Maps UI-knappar, navigeringslänkar, bokningslänkar (Bokadirekt etc.) och annonser.'
+      : "Ignorera andra bolags info, annonser och hitta.se's eget innehåll.";
     const msg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 10,
       messages: [{
         role: 'user',
-        content: `Titta på texten nedan från hitta.se för företaget "${companyName}".\nHar JUST DETTA specifika företag en egen hemsida länkad på sidan?\nIgnorera andra bolags info, annonser och hitta.se's eget innehåll.\nSvara bara "ja" eller "nej".\n\n${pageText.slice(0, 3000)}`,
+        content: `Titta på texten nedan från ${context}.\nHar JUST DETTA specifika företag en egen hemsida (inte Facebook, Instagram, bokningssajt eller liknande) länkad på sidan?\n${ignoreNote}\nSvara bara "ja" eller "nej".\n\n${pageText.slice(0, 3000)}`,
       }],
     });
     const answer = (msg.content[0]?.text || '').toLowerCase().trim();
@@ -134,7 +140,7 @@ function parseRevealPhone(href) {
   if (num.startsWith('46')) num = '0' + num.slice(2);
   // Format: 0XX-XX XX XX
   if (num.length >= 9) {
-    const areaEnd = num.startsWith('08') ? 3 : 3;
+    const areaEnd = num.startsWith('08') ? 2 : 3;
     const area = num.slice(0, areaEnd);
     const rest = num.slice(areaEnd);
     const parts = rest.match(/.{1,2}/g) || [rest];
@@ -412,16 +418,12 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
           const phoneEl = document.querySelector('[data-item-id^="phone:"]');
           const phone = phoneEl ? phoneEl.textContent.trim() : '';
 
-          // Multi-signal website detection
-          const NON_WEBSITE_DOMAINS = ['google.com', 'maps.google', 'goo.gl', 'facebook.com',
-            'instagram.com', 'linkedin.com', 'twitter.com', 'youtube.com'];
+          // Website detection: only use Maps-specific selectors. The broad "any external link"
+          // check was removed because Maps pages often show booking/delivery links that are
+          // NOT the company's own website, causing false positives. Haiku catches the rest.
           const hasWebsite = !!(
             document.querySelector('[data-item-id="authority"]') ||
-            document.querySelector('a[aria-label*="ebbplats"], a[aria-label*="ebsite"], a[aria-label*="Hemsida"]') ||
-            Array.from(document.querySelectorAll('a[href]')).some(a => {
-              const h = a.href || '';
-              return h.startsWith('http') && !NON_WEBSITE_DOMAINS.some(d => h.includes(d));
-            })
+            document.querySelector('a[aria-label*="ebbplats"], a[aria-label*="ebsite"], a[aria-label*="Hemsida"]')
           );
 
           let rating = 0;
@@ -445,7 +447,7 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
         // If selector says no website, ask Haiku as backup
         let hasWebsite = data.has_website;
         if (!hasWebsite && process.env.ANTHROPIC_API_KEY) {
-          hasWebsite = await haikusHasWebsite(data.pageText, data.name);
+          hasWebsite = await haikusHasWebsite(data.pageText, data.name, 'maps');
           if (hasWebsite) log(`  ~ ${data.name} — hemsida hittad av Haiku på Maps`);
         }
 
@@ -525,14 +527,24 @@ async function verifyHittaCandidatesOnMaps(browser, candidates, city) {
 
       const result = await page.evaluate(() => {
         const h1 = document.querySelector('h1');
+        const hasWebsite = !!(
+          document.querySelector('[data-item-id="authority"]') ||
+          document.querySelector('a[aria-label*="ebbplats"], a[aria-label*="ebsite"], a[aria-label*="Hemsida"]')
+        );
         return {
           pageName: h1 ? h1.textContent.trim() : '',
-          hasWebsite: !!document.querySelector('[data-item-id="authority"]'),
+          hasWebsite,
+          pageText: document.body.innerText.slice(0, 3000),
         };
       });
 
       if (result.pageName && namesMatch(biz.name, result.pageName)) {
-        if (result.hasWebsite) {
+        let hasWebsite = result.hasWebsite;
+        if (!hasWebsite && process.env.ANTHROPIC_API_KEY) {
+          hasWebsite = await haikusHasWebsite(result.pageText, biz.name, 'maps');
+          if (hasWebsite) log(`  ✗ ${biz.name} — hemsida hittad av Haiku (individuell Maps-koll)`);
+        }
+        if (hasWebsite) {
           log(`  ✗ ${biz.name} — hemsida bekräftad på Google Maps`);
         } else {
           verified.push(biz);
@@ -920,7 +932,7 @@ function namesMatch(a, b) {
   if (na === nb) return true;
   const wa = na.split(' ')[0];
   const wb = nb.split(' ')[0];
-  return wa.length > 3 && wb.length > 3 && (na.includes(wb) || nb.includes(wa));
+  return wa.length >= 3 && wb.length >= 3 && (na.includes(wb) || nb.includes(wa));
 }
 
 function mergeResults(hittaResults, googleResults) {
@@ -1040,7 +1052,7 @@ async function runScraper({ industry, city, maxResults = 20, onProgress = () => 
     const hittaResults = await scrapeHitta(browser, industry, city, scrapeLimit);
     await randomDelay();
 
-    const { googleProspects, confirmedHasWebsite } = await scrapeGoogleMaps(browser, industry, city, scrapeLimit, hittaResults);
+    const { googleProspects, confirmedHasWebsite } = await scrapeGoogleMaps(browser, industry, city, maxResults, hittaResults);
 
     if (confirmedHasWebsite.size > 0) {
       log(`Filtrerar: ${confirmedHasWebsite.size} hitta-bolag bekräftade med hemsida tas bort`);
