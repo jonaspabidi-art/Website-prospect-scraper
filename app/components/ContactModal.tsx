@@ -198,16 +198,31 @@ Jonas`;
               }}>
                 {pitch}
               </div>
-              {prospect.phone && (
-                <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                    <path d="M2 3a1 1 0 0 1 1-1h2.5a1 1 0 0 1 1 .9l.5 3a1 1 0 0 1-.6 1l-1 .5a9 9 0 0 0 3.7 3.7l.5-1a1 1 0 0 1 1-.6l3 .5a1 1 0 0 1 .9 1V13a1 1 0 0 1-1 1A13 13 0 0 1 2 3Z"/>
+              <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {prospect.phone && (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                      <path d="M2 3a1 1 0 0 1 1-1h2.5a1 1 0 0 1 1 .9l.5 3a1 1 0 0 1-.6 1l-1 .5a9 9 0 0 0 3.7 3.7l.5-1a1 1 0 0 1 1-.6l3 .5a1 1 0 0 1 .9 1V13a1 1 0 0 1-1 1A13 13 0 0 1 2 3Z"/>
+                    </svg>
+                    <a href={`tel:${prospect.phone}`} style={{ color: 'var(--accent)', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>
+                      {prospect.phone}
+                    </a>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="8" cy="7" r="3"/><path d="M8 2a5 5 0 0 1 5 5c0 3.5-5 9-5 9S3 10.5 3 7a5 5 0 0 1 5-5Z"/>
                   </svg>
-                  <a href={`tel:${prospect.phone}`} style={{ color: 'var(--accent)', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>
-                    {prospect.phone}
+                  <a
+                    href={`https://www.google.com/maps/search/?q=${encodeURIComponent(prospect.name + (city ? ' ' + city : '') + ' Sverige')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--accent)', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}
+                  >
+                    Visa på Google Maps
                   </a>
                 </div>
-              )}
+              </div>
             </>
           )}
           {mode === 'sms' && (
