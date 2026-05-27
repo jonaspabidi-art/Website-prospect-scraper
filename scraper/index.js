@@ -407,18 +407,20 @@ async function enrichWithAllabolag(browser, businesses) {
           });
           await delay(700);
           const url = page.url();
-          onCompanyPage = !url.includes('/what/') && !url.includes('/search') && !url.includes('/404');
-        } catch {}
+          // Accept if the URL contains a 10-digit org number path segment
+          onCompanyPage = /\/\d{10}(\/|$)/.test(url);
+          log(`    → Path1 URL: ${url} → ${onCompanyPage ? 'OK' : 'ej bolagssida'}`);
+        } catch (e) {
+          log(`    → Path1 fel: ${e.message.split('\n')[0]}`);
+        }
       }
     }
 
     // Path 2: search by name, then navigate to first company result
     if (!onCompanyPage) {
       try {
-        await page.goto(
-          `https://www.allabolag.se/what/${encodeURIComponent(biz.name)}`,
-          { waitUntil: 'domcontentloaded', timeout: 20000 }
-        );
+        const searchUrl = `https://www.allabolag.se/what/${encodeURIComponent(biz.name)}`;
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
         await delay(800);
 
         if (!cookiesAccepted) {
@@ -426,28 +428,37 @@ async function enrichWithAllabolag(browser, businesses) {
             await page.evaluate(() => {
               const btn = document.querySelector(
                 '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll, ' +
-                'button[id*="accept-all"], button[class*="accept"]'
+                'button[id*="accept-all"], button[class*="accept"], ' +
+                'button[aria-label*="ccept"], [class*="consent"] button'
               );
               if (btn) btn.click();
             });
-            await delay(400);
+            await delay(600);
             cookiesAccepted = true;
           } catch {}
         }
 
-        // Find first link whose path is a 10-digit org number
-        const companyHref = await page.evaluate(() => {
-          const a = Array.from(document.querySelectorAll('a[href]'))
-            .find(a => /^\/\d{10}(\/|$)/.test(a.getAttribute('href')));
-          return a ? a.href : null;
-        });
+        const searchLanded = page.url();
+        log(`    → Sök-URL: ${searchLanded}`);
+
+        // Widen regex: match /1234567890 anywhere in href (handles /foretag/1234567890 etc.)
+        const { companyHref, linkCount } = await page.evaluate(() => {
+          const all = Array.from(document.querySelectorAll('a[href]'));
+          const a = all.find(a => /\/\d{10}(\/|$)/.test(a.getAttribute('href') || ''));
+          return { companyHref: a ? a.href : null, linkCount: all.length };
+        }).catch(() => ({ companyHref: null, linkCount: 0 }));
+
+        log(`    → ${linkCount} länkar, bolagslänk: ${companyHref || 'ingen hittad'}`);
 
         if (companyHref) {
           await page.goto(companyHref, { waitUntil: 'domcontentloaded', timeout: 20000 });
           await delay(800);
           onCompanyPage = true;
+          log(`    → Navigerade till: ${page.url()}`);
         }
-      } catch {}
+      } catch (e) {
+        log(`    → Path2 fel: ${e.message.split('\n')[0]}`);
+      }
     }
 
     if (!onCompanyPage) {
