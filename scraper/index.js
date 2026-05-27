@@ -356,7 +356,7 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
       await delay(1200);
 
       const count = await page.evaluate(() =>
-        document.querySelectorAll('[role="feed"] a.hfpxzc').length
+        document.querySelectorAll('[role="feed"] a[href*="/maps/place/"]').length
       );
 
       if (count === prevCount) stableRounds++;
@@ -367,8 +367,8 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
 
     // Step 3: collect all place URLs (deduplicated, skip sponsored ads)
     const placeUrls = await page.evaluate(() => {
-      const links = document.querySelectorAll('[role="feed"] a.hfpxzc');
-      return [...new Set(Array.from(links).map(a => a.href))].filter(h => h.includes('/maps/place/'));
+      const links = document.querySelectorAll('[role="feed"] a[href*="/maps/place/"]');
+      return [...new Set(Array.from(links).map(a => a.href))];
     });
 
     log(`  Google Maps: ${placeUrls.length} platser att undersöka`);
@@ -464,17 +464,48 @@ async function verifyHittaDetails(browser, candidates) {
 
       const result = await page.evaluate(() => {
         const text = document.body.innerText;
+        const NON_WEBSITE_DOMAINS = ['google.com', 'maps.google', 'facebook.com', 'instagram.com',
+          'linkedin.com', 'twitter.com', 'youtube.com', 'yelp.com', 'trustpilot.com',
+          'blocket.se', 'ratsit.se', 'allabolag.se', 'uc.se', 'eniro.se'];
 
         let hasWebsite = false;
+        // 1. Text pattern: "hemsida: https://..." or "webbplats: www...."
         if (/hemsida\s*:?\s*(https?:\/\/|www\.)/i.test(text)) hasWebsite = true;
         if (!hasWebsite && /webbplats\s*:?\s*(https?:\/\/|www\.)/i.test(text)) hasWebsite = true;
+        // 2. Explicit aria-label/title links
         if (!hasWebsite && document.querySelector(
           'a[aria-label*="hemsida"], a[aria-label*="webbplats"], ' +
           'a[title*="hemsida"], a[title*="webbplats"]'
         )) hasWebsite = true;
+        // 3. "hemsida" text followed by a www. URL nearby
         if (!hasWebsite) {
           const idx = text.toLowerCase().indexOf('hemsida');
           if (idx !== -1 && /www\.[a-z0-9-]+\.[a-z]{2,}/i.test(text.slice(idx, idx + 200))) hasWebsite = true;
+        }
+        // 4. Hitta.se redirect/proxy links (most common: "Besök hemsida" button)
+        if (!hasWebsite) {
+          hasWebsite = Array.from(document.querySelectorAll('a[href]')).some(a => {
+            const h = a.href || '';
+            return h.includes('exitUrl') || h.includes('/redir') || h.includes('redirect=');
+          });
+        }
+        // 5. Any link text that says "hemsida" or "webbplats"
+        if (!hasWebsite) {
+          hasWebsite = Array.from(document.querySelectorAll('a[href]')).some(a => {
+            const t = (a.textContent || a.getAttribute('aria-label') || '').toLowerCase();
+            const h = a.href || '';
+            return h.length > 10 && (t.includes('hemsida') || t.includes('webbplats'));
+          });
+        }
+        // 6. Any external link that isn't a social/directory site
+        if (!hasWebsite) {
+          hasWebsite = Array.from(document.querySelectorAll('a[href]')).some(a => {
+            const h = a.href || '';
+            return (h.startsWith('http://') || h.startsWith('https://')) &&
+              !h.includes('hitta.se') && !h.includes('cdn.') &&
+              !h.startsWith('tel:') && !h.startsWith('mailto:') &&
+              !NON_WEBSITE_DOMAINS.some(d => h.includes(d));
+          });
         }
 
         // Also grab org number while we're here — feeds allabolag Path 1
