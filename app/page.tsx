@@ -3,6 +3,21 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+const INDUSTRIES = [
+  'Däckverkstad', 'Bilverkstad', 'Bilreparation', 'Lackerare',
+  'Målare', 'Målerifirma', 'Elektriker', 'VVS', 'Rörmokare',
+  'Plåtslagare', 'Snickare', 'Byggfirma', 'Glasmästare', 'Låssmed',
+  'Trädgård', 'Trädgårdsanläggning', 'Städfirma',
+  'Frisör', 'Frisörssalong', 'Skönhetssalong', 'Solarium',
+  'Nagelstudio', 'Hudvård', 'Massage', 'Fotvård',
+  'Hundvård', 'Djurklippning', 'Veterinär',
+  'Restaurang', 'Café', 'Pizzeria', 'Konditori', 'Bageri',
+  'Flyttfirma', 'Transportfirma', 'Åkeri',
+  'Redovisningsbyrå', 'Bokföring',
+  'Tandläkare', 'Optiker', 'Fysioterapeut',
+  'Blomsterhandel', 'Sportaffär',
+];
+
 type Job = {
   id: string;
   industry: string;
@@ -43,6 +58,7 @@ export default function SokPage() {
   const [loading, setLoading] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchJobs = async () => {
     const res = await fetch('/api/jobs');
@@ -72,6 +88,27 @@ export default function SokPage() {
     fetchJobs();
   };
 
+  const deleteJob = async (e: React.MouseEvent, jobId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm('Ta bort sökning och alla dess prospects?')) return;
+    setDeletingId(jobId);
+    await fetch(`/api/jobs/${jobId}`, { method: 'DELETE' });
+    setDeletingId(null);
+    if (activeJobId === jobId) setActiveJobId(null);
+    fetchJobs();
+  };
+
+  const rerun = (e: React.MouseEvent, job: Job) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIndustry(job.industry);
+    setCity(job.city);
+    setMaxResults(job.maxResults);
+    setActiveJobId(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const activeJob = jobs.find(j => j.id === activeJobId);
   const lastProgressLine = activeJob?.progress?.split('\n').filter(Boolean).slice(-1)[0] ?? '';
 
@@ -99,10 +136,14 @@ export default function SokPage() {
               <input
                 value={industry}
                 onChange={e => setIndustry(e.target.value)}
+                list="industries-list"
                 placeholder="t.ex. däckverkstad"
                 required
                 style={inputStyle}
               />
+              <datalist id="industries-list">
+                {INDUSTRIES.map(i => <option key={i} value={i} />)}
+              </datalist>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>Stad</label>
@@ -242,34 +283,63 @@ export default function SokPage() {
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {jobs.map(job => (
-              <Link
-                key={job.id}
-                href={`/jobs/${job.id}`}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  background: 'var(--bg)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--r-md)',
-                  padding: '14px 18px',
-                  textDecoration: 'none',
-                  color: 'var(--text)',
-                  boxShadow: 'var(--shadow-sm)',
-                  transition: 'box-shadow 0.15s',
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{job.industry} — {job.city}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                    {new Date(job.createdAt).toLocaleString('sv-SE')}
+              <div key={job.id} style={{ position: 'relative' }}>
+                <Link
+                  href={`/jobs/${job.id}`}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r-md)',
+                    padding: '14px 18px',
+                    paddingRight: 96,
+                    textDecoration: 'none',
+                    color: 'var(--text)',
+                    boxShadow: 'var(--shadow-sm)',
+                    opacity: deletingId === job.id ? 0.4 : 1,
+                    transition: 'box-shadow 0.15s, opacity 0.15s',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 15 }}>{job.industry} — {job.city}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {new Date(job.createdAt).toLocaleString('sv-SE')}
+                    </div>
                   </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {job.status === 'completed' && (
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{job._count.prospects} prospects</span>
+                    )}
+                    <Pill status={job.status} />
+                  </div>
+                </Link>
+
+                {/* Action buttons — float over the right edge */}
+                <div style={{
+                  position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                  display: 'flex', gap: 4,
+                }}>
+                  <button
+                    onClick={e => rerun(e, job)}
+                    title="Kör igen"
+                    style={iconBtnStyle}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 4v5h5"/><path d="M1 9A7 7 0 1 0 4 3.5"/>
+                    </svg>
+                  </button>
+                  <button
+                    onClick={e => deleteJob(e, job.id)}
+                    title="Radera"
+                    disabled={deletingId === job.id}
+                    style={{ ...iconBtnStyle, color: 'var(--red)' }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-9"/>
+                    </svg>
+                  </button>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {job.status === 'completed' && (
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{job._count.prospects} prospects</span>
-                  )}
-                  <Pill status={job.status} />
-                </div>
-              </Link>
+              </div>
             ))}
           </div>
         </div>
@@ -292,4 +362,15 @@ const inputStyle: React.CSSProperties = {
   width: '100%',
   letterSpacing: '-0.005em',
   transition: 'border-color 0.15s, box-shadow 0.15s',
+};
+
+const iconBtnStyle: React.CSSProperties = {
+  width: 28, height: 28,
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--r-sm)',
+  background: 'var(--bg)',
+  color: 'var(--text-muted)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  cursor: 'pointer',
+  transition: 'background 0.12s, color 0.12s',
 };
