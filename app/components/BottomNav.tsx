@@ -33,6 +33,26 @@ const NAV = [
       </svg>
     ),
   },
+  {
+    href: '/customers',
+    label: 'Kunder',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="8" cy="6" r="3"/><path d="M2 18c0-4 3-6 6-6s6 2 6 6"/>
+        <circle cx="15" cy="6" r="2.5"/><path d="M18 18c0-3-1.5-5-3-5.5"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/demos',
+    label: 'Demos',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="16" height="11" rx="2"/>
+        <path d="M7 18h6M10 14v4"/>
+      </svg>
+    ),
+  },
 ];
 
 export default function BottomNav() {
@@ -54,7 +74,7 @@ export default function BottomNav() {
               flex: 1,
               padding: '6px 0',
               color: active ? 'var(--accent)' : 'var(--text-faint)',
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: active ? 600 : 400,
               transition: 'color 0.15s',
             }}

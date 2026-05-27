@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
-const NAV = [
+const PROSPECT_NAV = [
   {
     href: '/',
     label: 'Sök prospects',
@@ -36,9 +36,59 @@ const NAV = [
   },
 ];
 
-export default function Sidebar() {
-  const path = usePathname();
+const BUSINESS_NAV = [
+  {
+    href: '/customers',
+    label: 'Kunder',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="8" cy="6" r="3"/><path d="M2 18c0-4 3-6 6-6s6 2 6 6"/>
+        <circle cx="15" cy="6" r="2.5"/><path d="M18 18c0-3-1.5-5-3-5.5"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/demos',
+    label: 'Demosidor',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="16" height="11" rx="2"/>
+        <path d="M7 18h6M10 14v4"/>
+      </svg>
+    ),
+  },
+];
 
+function NavItem({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
+  const path = usePathname();
+  const active = path === href || (href !== '/' && path.startsWith(href));
+  return (
+    <Link
+      href={href}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '9px 12px',
+        borderRadius: 10,
+        textDecoration: 'none',
+        fontSize: 14,
+        fontWeight: 500,
+        letterSpacing: '-0.005em',
+        background: active ? 'rgba(0,0,0,0.06)' : 'transparent',
+        color: 'var(--text)',
+        transition: 'background 0.15s',
+      }}
+    >
+      <span style={{ color: active ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }}>
+        {icon}
+      </span>
+      <span>{label}</span>
+    </Link>
+  );
+}
+
+export default function Sidebar() {
   return (
     <aside className="desktop-sidebar" style={{
       width: 232,
@@ -61,38 +111,25 @@ export default function Sidebar() {
         textTransform: 'uppercase', color: 'var(--text-faint)',
         padding: '0 10px 10px',
       }}>
-        Arbetsyta
+        Prospektering
       </div>
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {NAV.map(({ href, label, icon }) => {
-          const active = path === href || (href !== '/' && path.startsWith(href));
-          return (
-            <Link
-              key={href}
-              href={href}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: '9px 12px',
-                borderRadius: 10,
-                textDecoration: 'none',
-                fontSize: 14,
-                fontWeight: 500,
-                letterSpacing: '-0.005em',
-                background: active ? 'rgba(0,0,0,0.06)' : 'transparent',
-                color: 'var(--text)',
-                transition: 'background 0.15s',
-              }}
-            >
-              <span style={{ color: active ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }}>
-                {icon}
-              </span>
-              <span>{label}</span>
-            </Link>
-          );
-        })}
+        {PROSPECT_NAV.map(item => <NavItem key={item.href} {...item} />)}
+      </nav>
+
+      <div style={{
+        fontSize: 11, fontWeight: 600, letterSpacing: '0.06em',
+        textTransform: 'uppercase', color: 'var(--text-faint)',
+        padding: '20px 10px 10px',
+        borderTop: '1px solid var(--border)',
+        marginTop: 16,
+      }}>
+        Verksamhet
+      </div>
+
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {BUSINESS_NAV.map(item => <NavItem key={item.href} {...item} />)}
       </nav>
 
       <div style={{
