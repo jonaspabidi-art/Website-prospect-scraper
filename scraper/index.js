@@ -193,12 +193,16 @@ async function scrapeHitta(browser, industry, city, maxResults) {
             const orgNumber = orgText ? orgText[1] : '';
 
             // Website detection — multiple signals:
-            // 1. Direct external links (not hitta.se itself)
+            // 1. Direct external links (not hitta.se or known non-website domains)
+            const NON_WEBSITE_DOMAINS = ['google.com', 'maps.google', 'facebook.com', 'instagram.com',
+              'linkedin.com', 'twitter.com', 'youtube.com', 'yelp.com', 'trustpilot.com',
+              'blocket.se', 'ratsit.se', 'allabolag.se', 'uc.se', 'eniro.se'];
             const hasDirectLink = Array.from(card.querySelectorAll('a')).some(a => {
               const h = a.href || '';
               return (h.startsWith('http://') || h.startsWith('https://')) &&
                      !h.includes('hitta.se') && !h.includes('cdn.') &&
-                     !h.startsWith('tel:') && !h.startsWith('mailto:');
+                     !h.startsWith('tel:') && !h.startsWith('mailto:') &&
+                     !NON_WEBSITE_DOMAINS.some(d => h.includes(d));
             });
             // 2. Hitta redirect/proxy website links
             const hasRedirectLink = Array.from(card.querySelectorAll('a')).some(a => {
@@ -214,12 +218,15 @@ async function scrapeHitta(browser, industry, city, maxResults) {
             const hasWwwText = /\bwww\.[a-zåäö0-9-]{2,}\.[a-z]{2,}/i.test(card.textContent);
 
             const hasWebsite = hasDirectLink || hasRedirectLink || hasWebsiteEl || hasWwwText;
+            const websiteReason = hasWebsite
+              ? (hasDirectLink ? 'directLink' : hasRedirectLink ? 'redirectLink' : hasWebsiteEl ? 'websiteEl' : 'wwwText')
+              : null;
 
             // Company detail URL (used for cross-verification)
             const detailLink = card.querySelector('a[href*="/verksamhet/"]:not([href*="revealNumber"])');
             const detailUrl = detailLink ? detailLink.href : '';
 
-            items.push({ name, address, category, phoneHref, orgNumber, hasWebsite, detailUrl });
+            items.push({ name, address, category, phoneHref, orgNumber, hasWebsite, websiteReason, detailUrl });
           } catch {}
         });
 
@@ -237,7 +244,11 @@ async function scrapeHitta(browser, industry, city, maxResults) {
       }
 
       const noWebsite = pageData.items.filter(i => !i.hasWebsite);
+      const withWebsite = pageData.items.filter(i => i.hasWebsite);
       log(`  hitta.se sida ${pageNum}: ${pageData.cardCount} kort, ${noWebsite.length} utan hemsida`);
+      for (const w of withWebsite) {
+        log(`  ~ ${w.name} — hemsida detekterad (${w.websiteReason})`);
+      }
 
       for (const item of noWebsite) {
         if (results.length >= maxResults) break;
