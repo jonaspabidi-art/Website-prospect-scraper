@@ -459,6 +459,84 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
   return { googleProspects, confirmedHasWebsite };
 }
 
+// ─── Per-company Google Maps Verification ────────────────────────────────────
+
+async function verifyHittaCandidatesOnMaps(browser, candidates, city) {
+  if (candidates.length === 0) return candidates;
+  log(`\nMaps-verifiering: kollar ${candidates.length} hitta.se-kandidater individuellt...`);
+
+  const page = await browser.newPage();
+  await page.setUserAgent(randomUA());
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.setRequestInterception(true);
+  page.on('request', req => {
+    if (['image', 'font', 'media'].includes(req.resourceType())) req.abort();
+    else req.continue();
+  });
+
+  let consentDone = false;
+  const verified = [];
+
+  for (const biz of candidates) {
+    try {
+      const query = `${biz.name} ${city}`;
+      await page.goto(
+        `https://www.google.com/maps/search/${encodeURIComponent(query)}`,
+        { waitUntil: 'domcontentloaded', timeout: 20000 }
+      );
+      await delay(1000);
+
+      if (!consentDone) {
+        try {
+          const btn = await page.$('button[jsname="b3VHJd"]');
+          if (btn) { await btn.click(); await delay(1500); }
+        } catch {}
+        consentDone = true;
+      }
+
+      await page.waitForSelector('h1, [role="feed"]', { timeout: 8000 }).catch(() => {});
+
+      // If search returned a list, navigate into the first result
+      const feedLink = await page.$('[role="feed"] a[href*="/maps/place/"]');
+      if (feedLink) {
+        const href = await feedLink.evaluate(el => el.href);
+        await page.goto(href, { waitUntil: 'domcontentloaded', timeout: 15000 });
+        await delay(800);
+      }
+
+      const result = await page.evaluate(() => {
+        const h1 = document.querySelector('h1');
+        return {
+          pageName: h1 ? h1.textContent.trim() : '',
+          hasWebsite: !!document.querySelector('[data-item-id="authority"]'),
+        };
+      });
+
+      if (result.pageName && namesMatch(biz.name, result.pageName)) {
+        if (result.hasWebsite) {
+          log(`  ✗ ${biz.name} — hemsida bekräftad på Google Maps`);
+        } else {
+          verified.push(biz);
+          log(`  ✓ ${biz.name} — ingen hemsida på Maps`);
+        }
+      } else {
+        // Name mismatch or no result — keep to avoid over-filtering
+        verified.push(biz);
+        log(`  ? ${biz.name} — ingen Maps-träff, behåller`);
+      }
+
+      await delay(600 + Math.random() * 400);
+    } catch (err) {
+      log(`  ? ${biz.name} — Maps-fel: ${err.message.split('\n')[0]}, behåller`);
+      verified.push(biz);
+    }
+  }
+
+  await page.close();
+  log(`Maps-verifiering klar: ${candidates.length - verified.length} borttagna, ${verified.length} kvar`);
+  return verified;
+}
+
 // ─── Hitta.se Detail Page Verification ───────────────────────────────────────
 
 async function verifyHittaDetails(browser, candidates) {
@@ -954,7 +1032,10 @@ async function runScraper({ industry, city, maxResults = 20, onProgress = () => 
     // Pass 2: visit hitta.se detail pages for remaining candidates
     const verifiedHitta = await verifyHittaDetails(browser, filteredHitta);
 
-    const merged = mergeResults(verifiedHitta, googleProspects);
+    // Pass 3: targeted per-company Google Maps check
+    const mapsVerifiedHitta = await verifyHittaCandidatesOnMaps(browser, verifiedHitta, city);
+
+    const merged = mergeResults(mapsVerifiedHitta, googleProspects);
 
     if (merged.length === 0) {
       log('Inga företag hittades utan hemsida.');
