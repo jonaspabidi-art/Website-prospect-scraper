@@ -916,10 +916,16 @@ async function runScraper({ industry, city, maxResults = 20, onProgress = () => 
 
     const enriched = await enrichWithAllabolag(browser, merged);
 
+    const MAX_EMPLOYEES = 20;
+
     // Filter out any prospect where allabolag confirmed a website (pass 3)
     const enrichedFiltered = enriched.filter(b => {
       if (b.website_found) {
         log(`  ✗ ${b.name} — webbplats bekräftad på allabolag, tas bort`);
+        return false;
+      }
+      if (b.employees && b.employees > MAX_EMPLOYEES) {
+        log(`  ✗ ${b.name} — för stor aktör (${b.employees} anst.), tas bort`);
         return false;
       }
       return true;
