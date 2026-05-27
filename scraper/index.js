@@ -391,44 +391,58 @@ async function verifyHittaDetails(browser, candidates) {
     else req.continue();
   });
 
-  const hasWebsiteSet = new Set();
+  const enrichedMap = new Map(); // name → updated biz object
 
   for (const biz of toCheck) {
     try {
       await page.goto(biz.detail_url, { waitUntil: 'domcontentloaded', timeout: 20000 });
       await delay(700);
 
-      const found = await page.evaluate(() => {
+      const result = await page.evaluate(() => {
         const text = document.body.innerText;
-        // "Hemsida: www.xxx.se" or "Webbplats: https://..."
-        if (/hemsida\s*:?\s*(https?:\/\/|www\.)/i.test(text)) return true;
-        if (/webbplats\s*:?\s*(https?:\/\/|www\.)/i.test(text)) return true;
-        // Explicit aria-label or title on website link elements
-        if (document.querySelector(
+
+        let hasWebsite = false;
+        if (/hemsida\s*:?\s*(https?:\/\/|www\.)/i.test(text)) hasWebsite = true;
+        if (!hasWebsite && /webbplats\s*:?\s*(https?:\/\/|www\.)/i.test(text)) hasWebsite = true;
+        if (!hasWebsite && document.querySelector(
           'a[aria-label*="hemsida"], a[aria-label*="webbplats"], ' +
           'a[title*="hemsida"], a[title*="webbplats"]'
-        )) return true;
-        // www. pattern appearing near "hemsida" keyword
-        const idx = text.toLowerCase().indexOf('hemsida');
-        if (idx !== -1 && /www\.[a-z0-9-]+\.[a-z]{2,}/i.test(text.slice(idx, idx + 200))) return true;
-        return false;
+        )) hasWebsite = true;
+        if (!hasWebsite) {
+          const idx = text.toLowerCase().indexOf('hemsida');
+          if (idx !== -1 && /www\.[a-z0-9-]+\.[a-z]{2,}/i.test(text.slice(idx, idx + 200))) hasWebsite = true;
+        }
+
+        // Also grab org number while we're here — feeds allabolag Path 1
+        const orgMatch = text.match(/(\d{6}-\d{4})/);
+        return { hasWebsite, orgNumber: orgMatch ? orgMatch[1] : '' };
       });
 
-      if (found) {
-        hasWebsiteSet.add(normalize(biz.name));
+      if (result.hasWebsite) {
         log(`  ✗ ${biz.name} — hemsida på detaljsida`);
       } else {
-        log(`  ✓ ${biz.name} — ingen hemsida bekräftad`);
+        const updated = result.orgNumber && !biz.org_number
+          ? { ...biz, org_number: result.orgNumber }
+          : biz;
+        if (result.orgNumber && !biz.org_number) log(`  ✓ ${biz.name} — ingen hemsida, org ${result.orgNumber}`);
+        else log(`  ✓ ${biz.name} — ingen hemsida bekräftad`);
+        enrichedMap.set(normalize(biz.name), updated);
       }
     } catch (err) {
       log(`  ? ${biz.name} — verifieringsfel: ${err.message.split('\n')[0]}`);
+      enrichedMap.set(normalize(biz.name), biz);
     }
     await delay(900 + Math.random() * 400);
   }
 
+  // Preserve order; candidates without detail_url pass through unchanged
   await page.close();
-  const filtered = candidates.filter(c => !hasWebsiteSet.has(normalize(c.name)));
-  log(`Detaljverifiering klar: ${hasWebsiteSet.size} extra borttagna, ${filtered.length} av ${candidates.length} kvar`);
+  const filtered = candidates
+    .filter(c => !c.detail_url || enrichedMap.has(normalize(c.name)))
+    .map(c => enrichedMap.get(normalize(c.name)) ?? c);
+
+  const removed = candidates.length - filtered.length;
+  log(`Detaljverifiering klar: ${removed} extra borttagna, ${filtered.length} av ${candidates.length} kvar`);
   return filtered;
 }
 
@@ -466,8 +480,9 @@ async function enrichWithAllabolag(browser, businesses) {
           });
           await delay(700);
           const url = page.url();
-          // Accept if the URL contains a 10-digit org number path segment
-          onCompanyPage = /\/\d{10}(\/|$)/.test(url);
+          // Old format: /NNNNNNNNNN/  — new format: /foretag/{slug}/.../{hash}
+          onCompanyPage = /\/\d{10}(\/|$)/.test(url) ||
+            (url.includes('allabolag.se/foretag/') && !url.includes('/foretag-s'));
           log(`    → Path1 URL: ${url} → ${onCompanyPage ? 'OK' : 'ej bolagssida'}`);
         } catch (e) {
           log(`    → Path1 fel: ${e.message.split('\n')[0]}`);
@@ -475,11 +490,14 @@ async function enrichWithAllabolag(browser, businesses) {
       }
     }
 
-    // Path 2: search by name, then navigate to first company result
+    // Path 2: use allabolag homepage search form (resilient against URL changes)
     if (!onCompanyPage) {
       try {
-        const searchUrl = `https://www.allabolag.se/what/${encodeURIComponent(biz.name)}`;
-        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+        // Use /what/ URL — redirects to bransch-sökning which lists company cards
+        await page.goto(
+          `https://www.allabolag.se/what/${encodeURIComponent(biz.name)}`,
+          { waitUntil: 'domcontentloaded', timeout: 20000 }
+        );
         await delay(800);
 
         if (!cookiesAccepted) {
@@ -493,19 +511,33 @@ async function enrichWithAllabolag(browser, businesses) {
               if (btn) btn.click();
             });
             await delay(600);
-            cookiesAccepted = true;
           } catch {}
+          cookiesAccepted = true;
         }
 
         const searchLanded = page.url();
         log(`    → Sök-URL: ${searchLanded}`);
 
-        // Widen regex: match /1234567890 anywhere in href (handles /foretag/1234567890 etc.)
-        const { companyHref, linkCount } = await page.evaluate(() => {
+        // Match both old /NNNNNNNNNN/ and new /foretag/{slug}/{city}/{cat}/{hash} formats.
+        // Prefer a link whose anchor text contains the first word of the company name.
+        const { companyHref, linkCount } = await page.evaluate((name) => {
+          const norm = s => s.toLowerCase().replace(/[åä]/g, 'a').replace(/ö/g, 'o').replace(/[^a-z0-9 ]/g, '');
+          const firstWord = norm(name).split(' ').find(w => w.length > 3) || norm(name).split(' ')[0];
+          const isCompanyHref = h =>
+            /\/\d{10}(\/|$)/.test(h) ||
+            (/\/foretag\/[^/]+\/[^/]+\/[^/]+\/[A-Za-z0-9]{8,}/.test(h) && !h.includes('/foretag-s'));
+
           const all = Array.from(document.querySelectorAll('a[href]'));
-          const a = all.find(a => /\/\d{10}(\/|$)/.test(a.getAttribute('href') || ''));
+          // First pass: find link whose visible text matches the company name
+          const exact = all.find(a =>
+            isCompanyHref(a.getAttribute('href') || '') &&
+            norm(a.textContent || '').includes(firstWord)
+          );
+          // Fallback: first any company-format link
+          const fallback = all.find(a => isCompanyHref(a.getAttribute('href') || ''));
+          const a = exact || fallback;
           return { companyHref: a ? a.href : null, linkCount: all.length };
-        }).catch(() => ({ companyHref: null, linkCount: 0 }));
+        }, biz.name).catch(() => ({ companyHref: null, linkCount: 0 }));
 
         log(`    → ${linkCount} länkar, bolagslänk: ${companyHref || 'ingen hittad'}`);
 
@@ -535,16 +567,23 @@ async function enrichWithAllabolag(browser, businesses) {
         // allabolag.se renders key figures as "Label\nValue unit" or "Label: Value unit".
         function extractAfterLabel(labels) {
           for (const label of labels) {
-            const re = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-            const idx = text.search(re);
+            const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+            // Format 1 (primary): "Label\t5 934" — allabolag tab-separates value on same line
+            const tabM = text.match(new RegExp(esc + '\\s*\\t\\s*(-?\\d[\\d\\s]*(?:[,.]\\d+)?)', 'i'));
+            if (tabM) {
+              const n = parseFloat(tabM[1].replace(/\s+/g, '').replace(',', '.'));
+              if (!isNaN(n) && n > 0) return { n, unit: 'tkr' };
+            }
+
+            // Format 2 (fallback): "Label\n2025   8 499 tkr" — year before value+unit
+            const idx = text.search(new RegExp(esc, 'i'));
             if (idx === -1) continue;
-            const slice = text.slice(idx + label.length, idx + label.length + 140);
-            // Match an optional sign, digits, optional thousands-space, optional decimals
-            const m = slice.match(/^\s*:?\s*(-?\d[\d\s]*(?:[,.]\d+)?)\s*(tkr|kkr|mnkr|msek|kr)?/i);
-            if (m) {
-              const n = parseFloat(m[1].replace(/\s+/g, '').replace(',', '.'));
-              const unit = (m[2] || 'tkr').toLowerCase();
-              if (!isNaN(n)) return { n, unit };
+            const slice = text.slice(idx + label.length, idx + label.length + 200);
+            const unitM = slice.match(/(?:(?:19|20)\d{2}\s+)?(-?\d[\d\s]*(?:[,.]\d+)?)\s*(tkr|kkr|mnkr|msek)/i);
+            if (unitM) {
+              const n = parseFloat(unitM[1].replace(/\s+/g, '').replace(',', '.'));
+              if (!isNaN(n) && n > 0) return { n, unit: unitM[2].toLowerCase() };
             }
           }
           return null;
