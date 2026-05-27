@@ -126,6 +126,10 @@ async function scrapeHitta(browser, industry, city, maxResults) {
                            card.querySelector('[class*="infoRow"] span');
             const address = addrEl ? addrEl.textContent.trim() : '';
 
+            // Industry/category label on the card
+            const catEl = card.querySelector('[class*="category"] span, [class*="bransch"], [class*="label"] span, [class*="type"] span, [class*="subtitle"]');
+            const category = catEl ? catEl.textContent.trim() : '';
+
             // Phone — extract from revealNumber href param (full number encoded)
             const phoneReveal = card.querySelector('a[href*="revealNumber"]');
             const phoneTel = card.querySelector('a[href^="tel:"]');
@@ -135,22 +139,34 @@ async function scrapeHitta(browser, industry, city, maxResults) {
             const orgText = card.textContent.match(/(\d{6}-\d{4})/);
             const orgNumber = orgText ? orgText[1] : '';
 
-            // Website: any external link not from hitta.se/cdn
-            const extLinks = Array.from(card.querySelectorAll('a')).filter(a => {
+            // Website detection — multiple signals:
+            // 1. Direct external links (not hitta.se itself)
+            const hasDirectLink = Array.from(card.querySelectorAll('a')).some(a => {
               const h = a.href || '';
               return (h.startsWith('http://') || h.startsWith('https://')) &&
-                     !h.includes('hitta.se') &&
-                     !h.includes('cdn.') &&
-                     !h.startsWith('tel:') &&
-                     !h.startsWith('mailto:');
+                     !h.includes('hitta.se') && !h.includes('cdn.') &&
+                     !h.startsWith('tel:') && !h.startsWith('mailto:');
             });
-            const hasWebsite = extLinks.length > 0;
+            // 2. Hitta redirect/proxy website links
+            const hasRedirectLink = Array.from(card.querySelectorAll('a')).some(a => {
+              const h = a.href || '';
+              const label = (a.textContent + (a.getAttribute('aria-label') || '')).toLowerCase();
+              return (h.includes('exitUrl') || h.includes('redir') || label.includes('hemsida') || label.includes('webbplats')) && h.length > 10;
+            });
+            // 3. Explicit website icon/element
+            const hasWebsiteEl = !!(
+              card.querySelector('[aria-label*="hemsida"], [aria-label*="webbplats"], [aria-label*="website"], [title*="hemsida"]')
+            );
+            // 4. Raw www. URL text in card (sometimes shown as plain text)
+            const hasWwwText = /\bwww\.[a-zåäö0-9-]{2,}\.[a-z]{2,}/i.test(card.textContent);
 
-            // Company detail URL (for future enrichment)
+            const hasWebsite = hasDirectLink || hasRedirectLink || hasWebsiteEl || hasWwwText;
+
+            // Company detail URL (used for cross-verification)
             const detailLink = card.querySelector('a[href*="/verksamhet/"]:not([href*="revealNumber"])');
             const detailUrl = detailLink ? detailLink.href : '';
 
-            items.push({ name, address, phoneHref, orgNumber, hasWebsite, detailUrl });
+            items.push({ name, address, category, phoneHref, orgNumber, hasWebsite, detailUrl });
           } catch {}
         });
 
@@ -168,20 +184,36 @@ async function scrapeHitta(browser, industry, city, maxResults) {
       }
 
       const noWebsite = pageData.items.filter(i => !i.hasWebsite);
-      log(`  hitta.se sida ${pageNum}: ${pageData.cardCount} kort, ${noWebsite.length} utan hemsida på listningssidan`);
+      log(`  hitta.se sida ${pageNum}: ${pageData.cardCount} kort, ${noWebsite.length} utan hemsida`);
 
-      // Take listing-card results at face value — no detail page verification
       for (const item of noWebsite) {
         if (results.length >= maxResults) break;
+
+        // Soft industry check: if a category was extracted and clearly doesn't relate
+        // to the requested industry, skip it. This filters out adjacent-category noise.
+        if (item.category) {
+          const norm = s => s.toLowerCase().replace(/[åä]/g, 'a').replace(/ö/g, 'o').replace(/[^a-z0-9 ]/g, '');
+          const cat = norm(item.category);
+          const ind = norm(industry);
+          const indWords = ind.split(' ').filter(w => w.length > 3);
+          const catWords = cat.split(' ').filter(w => w.length > 3);
+          const overlap = indWords.some(w => cat.includes(w)) || catWords.some(w => ind.includes(w));
+          if (!overlap && item.category.length > 3) {
+            log(`  ~ ${item.name} (bransch "${item.category}" matchar inte "${industry}", hoppar över)`);
+            continue;
+          }
+        }
+
         results.push({
           name: item.name,
           phone: parseRevealPhone(item.phoneHref),
           address: item.address,
+          category: item.category,
           org_number: item.orgNumber,
           has_website: false,
           source: 'hitta',
         });
-        log(`  + ${item.name} (${parseRevealPhone(item.phoneHref) || 'inget tel'})`);
+        log(`  + ${item.name}${item.category ? ` [${item.category}]` : ''} (${parseRevealPhone(item.phoneHref) || 'inget tel'})`);
       }
 
       // Stop paginating once we have enough, or no more pages
@@ -594,7 +626,11 @@ function calculateScore(biz) {
 async function runScraper({ industry, city, maxResults = 20, onProgress = () => {} }) {
   _logFn = (msg) => { onProgress(msg); };
 
-  log(`Prospektering: ${industry} i ${city} (max ${maxResults} per källa)`);
+  // Scrape 3× more candidates than requested so we can score all of them
+  // and return only the best N — not just the first N found.
+  const scrapeLimit = Math.min(maxResults * 3, 60);
+
+  log(`Prospektering: ${industry} i ${city} (samlar ${scrapeLimit} kandidater, returnerar topp ${maxResults})`);
 
   const browser = await puppeteer.launch({
     headless: 'new',
@@ -611,10 +647,10 @@ async function runScraper({ industry, city, maxResults = 20, onProgress = () => 
   await browser.defaultBrowserContext().overridePermissions('https://www.hitta.se', []);
 
   try {
-    const hittaResults = await scrapeHitta(browser, industry, city, maxResults);
+    const hittaResults = await scrapeHitta(browser, industry, city, scrapeLimit);
     await randomDelay();
 
-    const { googleProspects, confirmedHasWebsite } = await scrapeGoogleMaps(browser, industry, city, maxResults, hittaResults);
+    const { googleProspects, confirmedHasWebsite } = await scrapeGoogleMaps(browser, industry, city, scrapeLimit, hittaResults);
 
     if (confirmedHasWebsite.size > 0) {
       log(`Filtrerar: ${confirmedHasWebsite.size} hitta-bolag bekräftade med hemsida tas bort`);
@@ -634,8 +670,10 @@ async function runScraper({ industry, city, maxResults = 20, onProgress = () => 
     const scored = enriched.map(b => ({ ...b, priority_score: calculateScore(b) }));
     scored.sort((a, b) => b.priority_score - a.priority_score);
 
-    log(`KLAR! ${scored.length} prospekt hittade.`);
-    return scored;
+    // Return only the top N after scoring across all candidates
+    const topResults = scored.slice(0, maxResults);
+    log(`KLAR! Returnerar topp ${topResults.length} av ${scored.length} undersökta prospekt.`);
+    return topResults;
 
   } finally {
     await browser.close();
