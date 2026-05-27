@@ -10,9 +10,12 @@ export async function GET(req: Request) {
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '25');
 
+  const pipeline = searchParams.get('pipeline');
+
   const where = {
     ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
     ...(status && { status }),
+    ...(pipeline === 'true' && { inPipeline: true }),
     ...(stad && { city: { contains: stad, mode: 'insensitive' as const } }),
     ...(bransch && { job: { industry: { contains: bransch, mode: 'insensitive' as const } } }),
   };

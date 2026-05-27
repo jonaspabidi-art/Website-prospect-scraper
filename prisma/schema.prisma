@@ -37,5 +37,6 @@ model Prospect {
   source             String?
   priorityScore      Int       @default(0)
   status             String    @default("Ny")
+  inPipeline         Boolean   @default(false)
   createdAt          DateTime  @default(now())
 }

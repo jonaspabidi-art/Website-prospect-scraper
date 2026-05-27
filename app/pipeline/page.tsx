@@ -15,6 +15,7 @@ type Prospect = {
   googleRating: number | null;
   priorityScore: number;
   status: string;
+  inPipeline: boolean;
   source: string | null;
   createdAt: string;
   job: { industry: string; city: string };
@@ -39,7 +40,7 @@ export default function PipelinePage() {
   const [dragOver, setDragOver] = useState<string | null>(null);
 
   const fetchAll = async () => {
-    const res = await fetch('/api/prospects?page=1&limit=200');
+    const res = await fetch('/api/prospects?pipeline=true&limit=200');
     const data = await res.json();
     setAll(data.prospects ?? []);
   };
