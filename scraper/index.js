@@ -1,4 +1,25 @@
 const puppeteer = require('puppeteer');
+const Anthropic = require('@anthropic-ai/sdk');
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+async function haikusHasWebsite(pageText, companyName) {
+  try {
+    const msg = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 10,
+      messages: [{
+        role: 'user',
+        content: `Har företaget "${companyName}" en hemsida/webbplats baserat på texten nedan? Svara bara "ja" eller "nej".\n\n${pageText.slice(0, 3000)}`,
+      }],
+    });
+    const answer = (msg.content[0]?.text || '').toLowerCase().trim();
+    return answer.startsWith('ja');
+  } catch (err) {
+    log(`  Haiku-fel för "${companyName}": ${err.message.split('\n')[0]}`);
+    return false;
+  }
+}
 
 // ─── City Coordinates ─────────────────────────────────────────────────────────
 
@@ -510,10 +531,17 @@ async function verifyHittaDetails(browser, candidates) {
 
         // Also grab org number while we're here — feeds allabolag Path 1
         const orgMatch = text.match(/(\d{6}-\d{4})/);
-        return { hasWebsite, orgNumber: orgMatch ? orgMatch[1] : '' };
+        return { hasWebsite, orgNumber: orgMatch ? orgMatch[1] : '', pageText: text.slice(0, 3000) };
       });
 
-      if (result.hasWebsite) {
+      // If heuristics say no website, ask Haiku as a second opinion
+      let hasWebsite = result.hasWebsite;
+      if (!hasWebsite && process.env.ANTHROPIC_API_KEY) {
+        hasWebsite = await haikusHasWebsite(result.pageText, biz.name);
+        if (hasWebsite) log(`  ✗ ${biz.name} — hemsida hittad av Haiku`);
+      }
+
+      if (hasWebsite) {
         log(`  ✗ ${biz.name} — hemsida på detaljsida`);
       } else {
         const updated = result.orgNumber && !biz.org_number
