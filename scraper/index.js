@@ -3,6 +3,7 @@ const puppeteer = require('puppeteer');
 // ─── City Coordinates ─────────────────────────────────────────────────────────
 
 const CITY_COORDS = {
+  // Städer / kommuner
   göteborg: '57.7089:11.9746',
   stockholm: '59.3293:18.0686',
   malmö: '55.6050:13.0038',
@@ -18,11 +19,60 @@ const CITY_COORDS = {
   borås: '57.7210:12.9401',
   sundsvall: '62.3908:17.3069',
   gävle: '60.6749:17.1413',
+  mölndal: '57.6557:12.0140',
+  // Stadsdelar Göteborg
+  hisingen: '57.7200:11.9100',
+  'hisings kärra': '57.7780:11.9540',
+  'hisings backa': '57.7420:11.9470',
+  lindholmen: '57.7081:11.9340',
+  majorna: '57.6940:11.9260',
+  'centrum göteborg': '57.7089:11.9746',
+  kungsbacka: '57.4850:12.0760',
+  partille: '57.7390:12.1060',
+  // Stadsdelar Stockholm
+  södermalm: '59.3140:18.0706',
+  östermalm: '59.3380:18.0940',
+  kungsholmen: '59.3330:18.0320',
+  vasastan: '59.3440:18.0490',
+  lidingö: '59.3640:18.1640',
+  nacka: '59.3130:18.1630',
+  solna: '59.3670:18.0010',
+  sundbyberg: '59.3610:17.9710',
+  // Stadsdelar Malmö
+  limhamn: '55.5800:12.9320',
+  husie: '55.5790:13.0740',
+};
+
+// For sub-areas: which municipality name to use in the hitta.se ?var= parameter
+const CITY_VAR_OVERRIDE = {
+  hisingen: 'Göteborg',
+  'hisings kärra': 'Göteborg',
+  'hisings backa': 'Göteborg',
+  lindholmen: 'Göteborg',
+  majorna: 'Göteborg',
+  'centrum göteborg': 'Göteborg',
+  kungsbacka: 'Kungsbacka',
+  partille: 'Partille',
+  södermalm: 'Stockholm',
+  östermalm: 'Stockholm',
+  kungsholmen: 'Stockholm',
+  vasastan: 'Stockholm',
+  lidingö: 'Lidingö',
+  nacka: 'Nacka',
+  solna: 'Solna',
+  sundbyberg: 'Sundbyberg',
+  limhamn: 'Malmö',
+  husie: 'Malmö',
 };
 
 function getCityCoords(city) {
   const key = city.toLowerCase().trim();
   return CITY_COORDS[key] || null;
+}
+
+function getCityVar(city) {
+  const key = city.toLowerCase().trim();
+  return CITY_VAR_OVERRIDE[key] || city;
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -78,8 +128,11 @@ async function scrapeHitta(browser, industry, city, maxResults) {
   log(`Scrapar hitta.se för "${industry}" i ${city}...`);
 
   const coords = getCityCoords(city);
+  const varCity = getCityVar(city);
   if (!coords) {
-    log(`  Varning: Inga koordinater för ${city}, söker utan geo-filter`);
+    log(`  Varning: Inga koordinater för "${city}", söker utan geo-filter`);
+  } else if (varCity !== city) {
+    log(`  Stadsdel "${city}" → söker under "${varCity}" med geo.hint`);
   }
 
   const results = [];
@@ -102,7 +155,7 @@ async function scrapeHitta(browser, industry, city, maxResults) {
 
   while (hasMore && results.length < maxResults) {
     const geoParam = coords ? `&geo.hint=${coords}` : '';
-    const url = `https://www.hitta.se/s%C3%B6k?vad=${encodeURIComponent(industry)}&var=${encodeURIComponent(city)}&typ=ftg&sida=${pageNum}${geoParam}`;
+    const url = `https://www.hitta.se/s%C3%B6k?vad=${encodeURIComponent(industry)}&var=${encodeURIComponent(varCity)}&typ=ftg&sida=${pageNum}${geoParam}`;
     log(`  hitta.se sida ${pageNum}...`);
 
     try {
