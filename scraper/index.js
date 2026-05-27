@@ -10,7 +10,7 @@ async function haikusHasWebsite(pageText, companyName) {
       max_tokens: 10,
       messages: [{
         role: 'user',
-        content: `Har företaget "${companyName}" en hemsida/webbplats baserat på texten nedan? Svara bara "ja" eller "nej".\n\n${pageText.slice(0, 3000)}`,
+        content: `Titta på texten nedan från hitta.se för företaget "${companyName}".\nHar JUST DETTA specifika företag en egen hemsida länkad på sidan?\nIgnorera andra bolags info, annonser och hitta.se's eget innehåll.\nSvara bara "ja" eller "nej".\n\n${pageText.slice(0, 3000)}`,
       }],
     });
     const answer = (msg.content[0]?.text || '').toLowerCase().trim();
@@ -518,17 +518,6 @@ async function verifyHittaDetails(browser, candidates) {
             return h.length > 10 && (t.includes('hemsida') || t.includes('webbplats'));
           });
         }
-        // 6. Any external link that isn't a social/directory site
-        if (!hasWebsite) {
-          hasWebsite = Array.from(document.querySelectorAll('a[href]')).some(a => {
-            const h = a.href || '';
-            return (h.startsWith('http://') || h.startsWith('https://')) &&
-              !h.includes('hitta.se') && !h.includes('cdn.') &&
-              !h.startsWith('tel:') && !h.startsWith('mailto:') &&
-              !NON_WEBSITE_DOMAINS.some(d => h.includes(d));
-          });
-        }
-
         // Also grab org number while we're here — feeds allabolag Path 1
         const orgMatch = text.match(/(\d{6}-\d{4})/);
         return { hasWebsite, orgNumber: orgMatch ? orgMatch[1] : '', pageText: text.slice(0, 3000) };
