@@ -107,7 +107,25 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
                     <div className="font-medium">{p.name}</div>
                     {p.address && <div className="text-xs text-gray-400">{p.address}</div>}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{p.phone || '—'}</td>
+                  <td className="px-4 py-3">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {p.phone
+                        ? <a href={`tel:${p.phone}`} style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 13 }}>{p.phone}</a>
+                        : <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      }
+                      <a
+                        href={`https://www.google.com/maps/search/?q=${encodeURIComponent(p.name + ' ' + job.city + ' Sverige')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Visa på Google Maps"
+                        style={{ color: 'var(--text-faint)', display: 'flex', lineHeight: 1 }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="8" cy="7" r="3"/><path d="M8 2a5 5 0 0 1 5 5c0 3.5-5 9-5 9S3 10.5 3 7a5 5 0 0 1 5-5Z"/>
+                        </svg>
+                      </a>
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-gray-600">{p.employees ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{p.googleRating ? `${p.googleRating}★` : '—'}</td>
                   <td className="px-4 py-3">
