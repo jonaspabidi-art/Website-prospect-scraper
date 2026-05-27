@@ -16,6 +16,8 @@ type Prospect = {
   priorityScore: number;
   status: string;
   source: string | null;
+  mapsVerified: boolean;
+  mapsUrl: string | null;
   job: { industry: string; city: string };
 };
 
@@ -278,6 +280,11 @@ export default function ProspectsPage() {
                               <dl>
                                 <DetailRow label="Telefon" value={p.phone || '—'} link={p.phone ? `tel:${p.phone}` : undefined} />
                                 <DetailRow label="Källa" value={p.source || '—'} />
+                                <DetailRow
+                                  label="Google Maps"
+                                  value={p.mapsVerified ? 'Öppna Maps' : 'Ej hittad på Google'}
+                                  link={p.mapsVerified && p.mapsUrl ? p.mapsUrl : undefined}
+                                />
                               </dl>
                               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                                 <button onClick={() => setModal(p)} style={{ ...actionBtnStyle, background: 'var(--accent)', color: '#fff', border: 'none' }}>

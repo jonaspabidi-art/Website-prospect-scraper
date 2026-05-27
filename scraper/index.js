@@ -409,6 +409,7 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
         await page.goto(placeUrls[i], { waitUntil: 'domcontentloaded', timeout: 20000 });
         await page.waitForSelector('h1', { timeout: 5000 }).catch(() => {});
         await delay(500);
+        const mapsUrl = page.url();
 
         const data = await page.evaluate(() => {
           const h1 = document.querySelector('h1');
@@ -458,7 +459,7 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
             log(`  ✗ ${data.name} — har hemsida på Maps, tas bort från hitta-listan`);
           }
         } else {
-          googleProspects.push({ ...data, source: 'google' });
+          googleProspects.push({ ...data, source: 'google', maps_verified: true, maps_url: mapsUrl });
           log(`  ✓ ${data.name} | ${data.phone} | ${data.google_reviews_count} rec, ${data.google_rating}★`);
         }
 
@@ -547,7 +548,7 @@ async function verifyHittaCandidatesOnMaps(browser, candidates, city) {
         if (hasWebsite) {
           log(`  ✗ ${biz.name} — hemsida bekräftad på Google Maps`);
         } else {
-          verified.push(biz);
+          verified.push({ ...biz, maps_verified: true, maps_url: page.url() });
           log(`  ✓ ${biz.name} — ingen hemsida på Maps`);
         }
       } else {
@@ -975,6 +976,8 @@ function mergeResults(hittaResults, googleResults) {
         google_reviews_count: bestMatch.data.google_reviews_count || 0,
         google_rating: bestMatch.data.google_rating || 0,
         source: 'both',
+        maps_verified: true,
+        maps_url: bestMatch.data.maps_url || h.maps_url || null,
       });
     } else {
       merged.push({ ...h, google_reviews_count: 0, google_rating: 0 });
@@ -1005,6 +1008,7 @@ function mergeResults(hittaResults, googleResults) {
 function calculateScore(biz) {
   let score = 0;
   if (!biz.has_website) score += 3;
+  if (!biz.maps_verified) score -= 2;
   if (biz.revenue > 5_000_000) score += 4;
   else if (biz.revenue >= 1_000_000) score += 3;
   else if (biz.revenue >= 500_000) score += 2;

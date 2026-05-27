@@ -50,6 +50,8 @@ const worker = new Worker<ScrapeJobData>(
         googleReviewsCount: r.google_reviews_count || null,
         googleRating: r.google_rating || null,
         source: r.source || null,
+        mapsVerified: r.maps_verified ?? false,
+        mapsUrl: r.maps_url ?? null,
         priorityScore: r.priority_score || 0,
       })),
     });
