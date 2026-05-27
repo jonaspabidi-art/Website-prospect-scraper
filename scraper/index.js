@@ -411,7 +411,18 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
           const address = addrEl ? addrEl.textContent.trim() : '';
           const phoneEl = document.querySelector('[data-item-id^="phone:"]');
           const phone = phoneEl ? phoneEl.textContent.trim() : '';
-          const hasWebsite = !!document.querySelector('[data-item-id="authority"]');
+
+          // Multi-signal website detection
+          const NON_WEBSITE_DOMAINS = ['google.com', 'maps.google', 'goo.gl', 'facebook.com',
+            'instagram.com', 'linkedin.com', 'twitter.com', 'youtube.com'];
+          const hasWebsite = !!(
+            document.querySelector('[data-item-id="authority"]') ||
+            document.querySelector('a[aria-label*="ebbplats"], a[aria-label*="ebsite"], a[aria-label*="Hemsida"]') ||
+            Array.from(document.querySelectorAll('a[href]')).some(a => {
+              const h = a.href || '';
+              return h.startsWith('http') && !NON_WEBSITE_DOMAINS.some(d => h.includes(d));
+            })
+          );
 
           let rating = 0;
           const ratingSpans = Array.from(document.querySelectorAll('span')).filter(s =>
@@ -426,13 +437,19 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
             if (m) reviewCount = parseInt(m[0].replace(/\s/g, '')) || 0;
           }
 
-          return { name, address, phone, has_website: hasWebsite, google_rating: rating, google_reviews_count: reviewCount };
+          return { name, address, phone, has_website: hasWebsite, google_rating: rating, google_reviews_count: reviewCount, pageText: document.body.innerText.slice(0, 3000) };
         });
 
         if (!data.name) { await delay(500); continue; }
 
-        if (data.has_website) {
-          // Check if this Maps result matches a hitta.se prospect — if so, confirm they have a website
+        // If selector says no website, ask Haiku as backup
+        let hasWebsite = data.has_website;
+        if (!hasWebsite && process.env.ANTHROPIC_API_KEY) {
+          hasWebsite = await haikusHasWebsite(data.pageText, data.name);
+          if (hasWebsite) log(`  ~ ${data.name} — hemsida hittad av Haiku på Maps`);
+        }
+
+        if (hasWebsite) {
           const matched = hittaResults.find(h => namesMatch(h.name, data.name));
           if (matched) {
             confirmedHasWebsite.add(normalize(matched.name));
@@ -1036,7 +1053,26 @@ async function runScraper({ industry, city, maxResults = 20, onProgress = () => 
     // Pass 3: targeted per-company Google Maps check
     const mapsVerifiedHitta = await verifyHittaCandidatesOnMaps(browser, verifiedHitta, city);
 
-    const merged = mergeResults(mapsVerifiedHitta, googleProspects);
+    // Address filter: remove prospects clearly outside the searched city.
+    // Also accept known sub-areas (e.g. "Hisings Backa" for a Göteborg search).
+    const cityNorm = normalize(city);
+    const acceptedLocations = new Set([cityNorm, 'gothenburg', 'goteborg']);
+    for (const [area, parent] of Object.entries(CITY_VAR_OVERRIDE)) {
+      if (normalize(parent) === cityNorm) acceptedLocations.add(normalize(area));
+    }
+    const cityFilterFn = (b) => {
+      if (!b.address) return true;
+      const addr = normalize(b.address);
+      if (Array.from(acceptedLocations).some(loc => addr.includes(loc))) return true;
+      log(`  ✗ ${b.name} — adress "${b.address}" matchar inte ${city}`);
+      return false;
+    };
+    const filteredHittaByCity = mapsVerifiedHitta.filter(cityFilterFn);
+    const filteredGoogleByCity = googleProspects.filter(cityFilterFn);
+    const removedByCity = (mapsVerifiedHitta.length + googleProspects.length) - (filteredHittaByCity.length + filteredGoogleByCity.length);
+    if (removedByCity > 0) log(`Adressfilter: ${removedByCity} bolag borttagna (fel stad)`);
+
+    const merged = mergeResults(filteredHittaByCity, filteredGoogleByCity);
 
     if (merged.length === 0) {
       log('Inga företag hittades utan hemsida.');
