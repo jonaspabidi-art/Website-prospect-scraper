@@ -463,9 +463,8 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
 
 async function verifyHittaDetails(browser, candidates) {
   const toCheck = candidates.filter(c => c.detail_url);
+  log(`\nDetaljverifiering: ${toCheck.length}/${candidates.length} har detail_url, Haiku: ${process.env.ANTHROPIC_API_KEY ? 'aktivt' : 'saknas'}`);
   if (toCheck.length === 0) return candidates;
-
-  log(`\nDetaljverifiering: ${toCheck.length} hitta.se-sidor...`);
 
   const page = await browser.newPage();
   await page.setUserAgent(randomUA());
