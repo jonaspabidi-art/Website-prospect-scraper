@@ -73,3 +73,4 @@ worker.on('failed', async (job, err) => {
 });
 
 console.log('Worker startad, väntar på jobb...');
+console.log(`ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'inläst ✓' : 'SAKNAS ✗'}`);
