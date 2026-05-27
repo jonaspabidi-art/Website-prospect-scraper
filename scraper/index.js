@@ -496,12 +496,14 @@ async function verifyHittaCandidatesOnMaps(browser, candidates, city) {
 
       await page.waitForSelector('h1, [role="feed"]', { timeout: 8000 }).catch(() => {});
 
-      // If search returned a list, navigate into the first result
-      const feedLink = await page.$('[role="feed"] a[href*="/maps/place/"]');
-      if (feedLink) {
-        const href = await feedLink.evaluate(el => el.href);
-        await page.goto(href, { waitUntil: 'domcontentloaded', timeout: 15000 });
-        await delay(800);
+      // Only act on a direct place match — if Maps shows a list we can't
+      // be sure the first result is the right company, so keep the candidate.
+      const hasFeed = await page.$('[role="feed"]');
+      if (hasFeed) {
+        verified.push(biz);
+        log(`  ? ${biz.name} — Maps visade lista, behåller`);
+        await delay(400);
+        continue;
       }
 
       const result = await page.evaluate(() => {
@@ -520,9 +522,8 @@ async function verifyHittaCandidatesOnMaps(browser, candidates, city) {
           log(`  ✓ ${biz.name} — ingen hemsida på Maps`);
         }
       } else {
-        // Name mismatch or no result — keep to avoid over-filtering
         verified.push(biz);
-        log(`  ? ${biz.name} — ingen Maps-träff, behåller`);
+        log(`  ? ${biz.name} — ingen direkt Maps-träff, behåller`);
       }
 
       await delay(600 + Math.random() * 400);
