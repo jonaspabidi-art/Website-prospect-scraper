@@ -388,123 +388,184 @@ async function enrichWithAllabolag(browser, businesses) {
     else req.continue();
   });
 
+  let cookiesAccepted = false;
   const enriched = [];
 
   for (let i = 0; i < businesses.length; i++) {
     const biz = businesses[i];
     log(`  Allabolag ${i + 1}/${businesses.length}: "${biz.name}"`);
 
-    const searchTerm = biz.org_number ? biz.org_number.replace(/\D/g, '') : biz.name;
-    const searchUrl = `https://www.allabolag.se/what/${encodeURIComponent(searchTerm)}`;
+    let onCompanyPage = false;
 
-    try {
-      await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
-      await delay(1000);
-
-      // Accept cookies once
-      if (i === 0) {
+    // Path 1: direct URL via org number — most reliable, skip search entirely
+    if (biz.org_number) {
+      const orgClean = biz.org_number.replace(/\D/g, '');
+      if (orgClean.length === 10) {
         try {
-          const cookieBtn = await page.$('[id*="CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll"], button[id*="accept"]');
-          if (cookieBtn) { await cookieBtn.click(); await delay(500); }
+          await page.goto(`https://www.allabolag.se/${orgClean}`, {
+            waitUntil: 'domcontentloaded', timeout: 20000,
+          });
+          await delay(700);
+          const url = page.url();
+          onCompanyPage = !url.includes('/what/') && !url.includes('/search') && !url.includes('/404');
         } catch {}
       }
+    }
 
-      // If on search results page, click the most relevant result
-      const isSearchPage = page.url().includes('/what/') || page.url().includes('/search');
-      if (isSearchPage) {
-        const resultLink = await page.$('.search-results a, [class*="company"] a, [class*="result"] a[href*="/5"]');
-        if (resultLink) {
-          await resultLink.click();
-          await delay(1500);
+    // Path 2: search by name, then navigate to first company result
+    if (!onCompanyPage) {
+      try {
+        await page.goto(
+          `https://www.allabolag.se/what/${encodeURIComponent(biz.name)}`,
+          { waitUntil: 'domcontentloaded', timeout: 20000 }
+        );
+        await delay(800);
+
+        if (!cookiesAccepted) {
+          try {
+            await page.evaluate(() => {
+              const btn = document.querySelector(
+                '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll, ' +
+                'button[id*="accept-all"], button[class*="accept"]'
+              );
+              if (btn) btn.click();
+            });
+            await delay(400);
+            cookiesAccepted = true;
+          } catch {}
         }
-      }
 
-      const financials = await page.evaluate((bizName) => {
-        const bodyText = document.body.innerText;
-        const rows = Array.from(document.querySelectorAll('tr, [class*="row"]'));
+        // Find first link whose path is a 10-digit org number
+        const companyHref = await page.evaluate(() => {
+          const a = Array.from(document.querySelectorAll('a[href]'))
+            .find(a => /^\/\d{10}(\/|$)/.test(a.getAttribute('href')));
+          return a ? a.href : null;
+        });
 
-        function findValue(keywords) {
-          for (const row of rows) {
-            const text = row.textContent;
-            if (keywords.some(kw => text.toLowerCase().includes(kw.toLowerCase()))) {
-              const cells = row.querySelectorAll('td, [class*="cell"], [class*="value"]');
-              if (cells.length >= 2) {
-                const val = cells[cells.length - 1].textContent.replace(/\s+/g, '').replace(',', '.');
-                return val;
-              }
+        if (companyHref) {
+          await page.goto(companyHref, { waitUntil: 'domcontentloaded', timeout: 20000 });
+          await delay(800);
+          onCompanyPage = true;
+        }
+      } catch {}
+    }
+
+    if (!onCompanyPage) {
+      log(`    → Hittade inte "${biz.name}" på allabolag, hoppar över`);
+      enriched.push({ ...biz, revenue: 0, employees: biz.employees || 0, profit_positive: false, years_in_business: 0 });
+      await randomDelay();
+      continue;
+    }
+
+    try {
+      const fin = await page.evaluate(() => {
+        const text = document.body.innerText;
+
+        // Read the numeric value that appears right after a label (same line or next line).
+        // allabolag.se renders key figures as "Label\nValue unit" or "Label: Value unit".
+        function extractAfterLabel(labels) {
+          for (const label of labels) {
+            const re = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+            const idx = text.search(re);
+            if (idx === -1) continue;
+            const slice = text.slice(idx + label.length, idx + label.length + 140);
+            // Match an optional sign, digits, optional thousands-space, optional decimals
+            const m = slice.match(/^\s*:?\s*(-?\d[\d\s]*(?:[,.]\d+)?)\s*(tkr|kkr|mnkr|msek|kr)?/i);
+            if (m) {
+              const n = parseFloat(m[1].replace(/\s+/g, '').replace(',', '.'));
+              const unit = (m[2] || 'tkr').toLowerCase();
+              if (!isNaN(n)) return { n, unit };
             }
           }
           return null;
         }
 
-        // Revenue
-        const revRaw = findValue(['Omsättning', 'Nettoomsättning']);
+        // Revenue — allabolag shows values in tkr (thousands of SEK) by default
         let revenue = 0;
-        if (revRaw) {
-          const num = parseFloat(revRaw.replace(/[^\d.-]/g, ''));
-          if (!isNaN(num)) {
-            // Allabolag shows values in tkr (thousands)
-            revenue = num * 1000;
-          }
-        }
-        // Fallback: scan body text
-        if (!revenue) {
-          const match = bodyText.match(/Omsättning[^\d]*(\d[\d\s]*)\s*(?:tkr|kkr|kr|TSEK)/i);
-          if (match) revenue = parseInt(match[1].replace(/\s/g, '')) * 1000;
+        const rev = extractAfterLabel([
+          'Nettoomsättning', 'Omsättning', 'Rörelsens intäkter',
+        ]);
+        if (rev && rev.n > 0) {
+          revenue = /mnkr|msek/.test(rev.unit) ? rev.n * 1_000_000 : rev.n * 1_000;
         }
 
         // Employees
-        const empRaw = findValue(['Anställda', 'Medelantalet anställda']);
-        let employees = empRaw ? parseInt(empRaw.replace(/\D/g, '')) || 0 : 0;
+        let employees = 0;
+        const emp = extractAfterLabel([
+          'Medelantal anställda', 'Antal anställda', 'Anställda',
+        ]);
+        if (emp) employees = Math.round(Math.abs(emp.n));
         if (!employees) {
-          const empMatch = bodyText.match(/(?:Anställda|anställda)[^\d]*(\d+)/i);
-          if (empMatch) employees = parseInt(empMatch[1]) || 0;
+          const m = text.match(/anst[äa]llda\D{0,25}(\d+)/i);
+          if (m) employees = parseInt(m[1]) || 0;
         }
 
-        // Profit
-        const profitRaw = findValue(['Årets resultat', 'Nettoresultat', 'Resultat efter']);
+        // Profit sign
         let profitPositive = false;
-        if (profitRaw) {
-          profitPositive = !profitRaw.includes('-') && parseFloat(profitRaw.replace(/[^\d.-]/g, '')) > 0;
-        }
+        const profit = extractAfterLabel([
+          'Årets resultat', 'Resultat efter finansiella poster', 'Nettoresultat',
+        ]);
+        if (profit) profitPositive = profit.n > 0;
 
-        // Founding year
+        // Registration / founding year
         let foundingYear = 0;
         const yearPatterns = [
-          /Registrerad\s+(\d{4})/i,
-          /Bolaget grundades\s+(\d{4})/i,
-          /Startår\s*:?\s*(\d{4})/i,
-          /(?:sedan|från)\s+(\d{4})/i,
+          /[Rr]egistr(?:erings(?:datum|år)|erad)\s*:?\s*(\d{4})/,
+          /[Bb]ildat\s*:?\s*(\d{4})/,
+          /[Gg]rundades?\s+(\d{4})/,
+          /(\d{4})-\d{2}-\d{2}/,   // ISO date — first occurrence
         ];
         for (const pat of yearPatterns) {
-          const m = bodyText.match(pat);
-          if (m) { foundingYear = parseInt(m[1]); break; }
+          const m = text.match(pat);
+          if (m) {
+            const y = parseInt(m[1]);
+            if (y >= 1900 && y <= new Date().getFullYear()) { foundingYear = y; break; }
+          }
         }
 
-        // Also check meta info sections
-        const allText = document.querySelector('[class*="keyFigure"], [class*="key-figure"], [class*="company-info"]')?.textContent || '';
+        // JSON-LD structured data as supplementary source
+        try {
+          for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
+            const j = JSON.parse(s.textContent);
+            const node = Array.isArray(j['@graph'])
+              ? j['@graph'].find(x => x['@type'] === 'Organization' || x['@type'] === 'LocalBusiness')
+              : j;
+            if (!node) continue;
+            if (node.foundingDate && !foundingYear) {
+              const y = parseInt(String(node.foundingDate).slice(0, 4));
+              if (y >= 1900) foundingYear = y;
+            }
+            if (node.numberOfEmployees?.value && !employees) {
+              employees = parseInt(node.numberOfEmployees.value) || 0;
+            }
+          }
+        } catch {}
 
         return { revenue, employees, profit_positive: profitPositive, founding_year: foundingYear };
-      }, biz.name);
+      });
 
-      const yearsInBusiness = financials.founding_year > 1900
-        ? new Date().getFullYear() - financials.founding_year
+      const yearsInBusiness = fin.founding_year > 1900
+        ? new Date().getFullYear() - fin.founding_year
         : 0;
 
-      const enrichedBiz = {
+      enriched.push({
         ...biz,
-        revenue: financials.revenue,
-        employees: financials.employees,
-        profit_positive: financials.profit_positive,
+        revenue: fin.revenue,
+        employees: fin.employees || biz.employees || 0,
+        profit_positive: fin.profit_positive,
         years_in_business: yearsInBusiness,
-      };
+      });
 
-      enriched.push(enrichedBiz);
-      log(`    → Omsättning: ${financials.revenue ? Math.round(financials.revenue / 1000) + 'k kr' : 'N/A'} | ${financials.employees} anst. | ${yearsInBusiness ? yearsInBusiness + ' år' : '?'}`);
+      log(
+        `    → Omsättning: ${fin.revenue ? Math.round(fin.revenue / 1000) + 'k kr' : 'saknas'}` +
+        ` | ${fin.employees || 0} anst.` +
+        ` | ${yearsInBusiness || '?'} år` +
+        ` | ${fin.profit_positive ? 'vinst ✓' : 'ej vinst'}`
+      );
 
     } catch (err) {
       log(`  FEL allabolag "${biz.name}": ${err.message}`);
-      enriched.push({ ...biz, revenue: 0, employees: 0, profit_positive: false, years_in_business: 0 });
+      enriched.push({ ...biz, revenue: 0, employees: biz.employees || 0, profit_positive: false, years_in_business: 0 });
     }
 
     await randomDelay();
