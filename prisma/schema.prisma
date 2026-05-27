@@ -28,7 +28,7 @@ model Prospect {
   address            String?
   city               String?
   orgNumber          String?
-  revenue            Int?
+  revenue            Float?
   employees          Int?
   profitPositive     Boolean?
   yearsInBusiness    Int?
