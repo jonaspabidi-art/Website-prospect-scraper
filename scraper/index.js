@@ -180,20 +180,21 @@ async function checkWebsiteQuality(browser, candidates) {
             max_tokens: 5,
             messages: [{
               role: 'user',
-              content: `Titta på texten nedan från "${biz.name}"s hemsida.\nÄr hemsidan professionell och modern, eller ser den gammal, amatörmässig, innehållslös eller bristfällig ut?\nSvara bara "bra", "okej" eller "dålig".\n\n${data.pageText}`,
+              content: `Du är webbutvecklare som letar efter företag med dåliga hemsidor att sälja om. Analysera texten från "${biz.name}"s hemsida.\n\nSvara BARA "bra" eller "dålig".\n\nSvara "dålig" om hemsidan har NÅGOT av:\n- Lite eller inget innehåll, ser ut som en mall\n- Saknar tydlig beskrivning av tjänster\n- Ingen kontaktinfo eller kontaktformulär\n- Verkar föråldrad eller ej uppdaterad sedan länge\n- Amatörmässig eller rörig struktur\n\nSvara "bra" BARA om hemsidan tydligt har: moderna tjänstebeskrivningar, kontaktinfo och ett professionellt helhetsintryck.\n\n${data.pageText}`,
             }],
           });
           const ans = (msg.content[0]?.text || '').toLowerCase().trim();
           if (ans.startsWith('d')) { signals.push('Haiku: dålig'); quality = 'poor'; }
-          else if (ans.startsWith('b')) { quality = 'good'; }
+          else if (ans.startsWith('b') && signals.length < 2) { quality = 'good'; }
+          // Haiku says "bra" but 2+ technical signals → still poor
         } catch (err) {
           log(`  Haiku-fel hemsida "${biz.name}": ${err.message.split('\n')[0]}`);
         }
       }
 
-      // Signal count decides quality if Haiku didn't
+      // 1 signal is enough if Haiku didn't actively say "bra"
       if (quality !== 'good' && quality !== 'poor') {
-        quality = signals.length >= 2 ? 'poor' : 'ok';
+        quality = signals.length >= 1 ? 'poor' : 'ok';
       }
 
       const sigStr = signals.length ? signals.join(', ') : 'inga varningar';
