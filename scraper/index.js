@@ -169,7 +169,7 @@ async function checkWebsiteQuality(browser, candidates) {
       const t0 = Date.now();
       await page.goto(biz.website_url, { waitUntil: 'domcontentloaded', timeout: 20000 });
       const loadMs = Date.now() - t0;
-      await delay(400);
+      await delay(1500); // longer wait so JS-heavy sites render fully
 
       if (loadMs > 8000) signals.push(`Långsam (${Math.round(loadMs / 1000)}s)`);
 
@@ -186,21 +186,33 @@ async function checkWebsiteQuality(browser, candidates) {
         signals.push(`Föråldrad (© ${data.copyrightYear})`);
       }
 
-      // Haiku evaluates visible content
+      // Take screenshot so Haiku can visually judge the site
+      let screenshotB64 = null;
+      try {
+        const buf = await page.screenshot({ type: 'jpeg', quality: 55, clip: { x: 0, y: 0, width: 390, height: 844 } });
+        screenshotB64 = buf.toString('base64');
+      } catch (_) {}
+
+      // Haiku evaluates both screenshot and text
       if (process.env.ANTHROPIC_API_KEY) {
         try {
+          const prompt = `Du är webbutvecklare som letar efter företag med dåliga hemsidor att sälja om. Analysera hemsidan för "${biz.name}".\n\nSvara BARA "bra" eller "dålig".\n\nSvara "dålig" om hemsidan har NÅGOT av:\n- Lite eller inget innehåll, ser ut som en mall eller platshållare\n- Saknar tydlig beskrivning av tjänster\n- Ingen kontaktinfo eller kontaktformulär\n- Verkar föråldrad eller ej uppdaterad sedan länge\n- Amatörmässig eller rörig design/struktur\n\nSvara "bra" BARA om hemsidan tydligt har: modern design, tydliga tjänstebeskrivningar, kontaktinfo och ett professionellt helhetsintryck.\n\nSidtext:\n${data.pageText}`;
+
+          const content = screenshotB64
+            ? [
+                { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: screenshotB64 } },
+                { type: 'text', text: prompt },
+              ]
+            : prompt;
+
           const msg = await anthropic.messages.create({
             model: 'claude-haiku-4-5-20251001',
             max_tokens: 5,
-            messages: [{
-              role: 'user',
-              content: `Du är webbutvecklare som letar efter företag med dåliga hemsidor att sälja om. Analysera texten från "${biz.name}"s hemsida.\n\nSvara BARA "bra" eller "dålig".\n\nSvara "dålig" om hemsidan har NÅGOT av:\n- Lite eller inget innehåll, ser ut som en mall\n- Saknar tydlig beskrivning av tjänster\n- Ingen kontaktinfo eller kontaktformulär\n- Verkar föråldrad eller ej uppdaterad sedan länge\n- Amatörmässig eller rörig struktur\n\nSvara "bra" BARA om hemsidan tydligt har: moderna tjänstebeskrivningar, kontaktinfo och ett professionellt helhetsintryck.\n\n${data.pageText}`,
-            }],
+            messages: [{ role: 'user', content }],
           });
           const ans = (msg.content[0]?.text || '').toLowerCase().trim();
           if (ans.startsWith('d')) { signals.push('Haiku: dålig'); quality = 'poor'; }
           else if (ans.startsWith('b') && signals.length < 2) { quality = 'good'; }
-          // Haiku says "bra" but 2+ technical signals → still poor
         } catch (err) {
           log(`  Haiku-fel hemsida "${biz.name}": ${err.message.split('\n')[0]}`);
         }
