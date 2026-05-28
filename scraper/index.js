@@ -35,6 +35,13 @@ const FREE_PLATFORMS = [
   'mystrikingly.com', 'pages.google.com',
 ];
 
+// Chain/franchise domains — company doesn't own its own website, exclude as leads
+const CHAIN_DOMAINS = [
+  'autoexperten.se', 'adbildelar.se', 'mekonomen.se', 'meca.se',
+  'bosch-car-service.se', 'fixafelan.se', 'specsavers.se',
+  'euronics.se', 'elkjop.se', 'mediamarkt.se',
+];
+
 // ─── Hitta.se website URL extractor (weak_website mode) ──────────────────────
 
 async function extractHittaWebsiteUrls(browser, candidates) {
@@ -146,6 +153,13 @@ async function checkWebsiteQuality(browser, candidates) {
 
     const signals = [];
     let quality = 'ok';
+
+    // Chain/franchise pages — company has no independent website, skip as lead
+    if (CHAIN_DOMAINS.some(d => biz.website_url.includes(d))) {
+      log(`  ✗ ${biz.name} — kedjessida (${biz.website_url}), hoppar över`);
+      results.push({ ...biz, website_quality: 'good', website_signals: ['Kedjessida'] });
+      continue;
+    }
 
     // Instant checks from URL (no page visit needed)
     if (FREE_PLATFORMS.some(p => biz.website_url.includes(p))) signals.push('Gratis plattform');
