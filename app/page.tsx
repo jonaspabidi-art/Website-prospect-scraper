@@ -23,6 +23,7 @@ type Job = {
   industry: string;
   city: string;
   maxResults: number;
+  mode: 'no_website' | 'weak_website';
   status: string;
   progress: string | null;
   createdAt: string;
@@ -55,6 +56,7 @@ export default function SokPage() {
   const [industry, setIndustry] = useState('');
   const [city, setCity] = useState('');
   const [maxResults, setMaxResults] = useState(20);
+  const [mode, setMode] = useState<'no_website' | 'weak_website'>('no_website');
   const [loading, setLoading] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -78,7 +80,7 @@ export default function SokPage() {
     const res = await fetch('/api/jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ industry, city, maxResults }),
+      body: JSON.stringify({ industry, city, maxResults, mode }),
     });
     const job = await res.json();
     setActiveJobId(job.id);
@@ -105,6 +107,7 @@ export default function SokPage() {
     setIndustry(job.industry);
     setCity(job.city);
     setMaxResults(job.maxResults);
+    setMode(job.mode ?? 'no_website');
     setActiveJobId(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -130,6 +133,29 @@ export default function SokPage() {
         marginBottom: 20,
       }}>
         <form onSubmit={handleSubmit}>
+          {/* Mode toggle */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            {(['no_website', 'weak_website'] as const).map(m => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 'var(--r-pill)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  border: `1px solid ${mode === m ? 'var(--accent)' : 'var(--border)'}`,
+                  background: mode === m ? 'var(--accent-soft)' : 'var(--bg-muted)',
+                  color: mode === m ? 'var(--accent-text)' : 'var(--text-muted)',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {m === 'no_website' ? 'Utan hemsida' : 'Svag hemsida'}
+              </button>
+            ))}
+          </div>
           <div className="sok-form-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 0.7fr auto', gap: 16, alignItems: 'flex-end' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>Bransch</label>
@@ -301,7 +327,18 @@ export default function SokPage() {
                   }}
                 >
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 15 }}>{job.industry} — {job.city}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 600, fontSize: 15 }}>{job.industry} — {job.city}</span>
+                      <span style={{
+                        fontSize: 11, fontWeight: 500, padding: '1px 7px',
+                        borderRadius: 'var(--r-pill)',
+                        background: job.mode === 'weak_website' ? 'var(--yellow-soft)' : 'var(--bg-subtle)',
+                        color: job.mode === 'weak_website' ? 'var(--yellow)' : 'var(--text-faint)',
+                        border: `1px solid ${job.mode === 'weak_website' ? 'var(--yellow-border)' : 'var(--border)'}`,
+                      }}>
+                        {job.mode === 'weak_website' ? 'Svag hemsida' : 'Utan hemsida'}
+                      </span>
+                    </div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                       {new Date(job.createdAt).toLocaleString('sv-SE')}
                     </div>

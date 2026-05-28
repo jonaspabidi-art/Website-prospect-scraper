@@ -11,7 +11,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   if (!job) return NextResponse.json({ error: 'Hittades inte' }, { status: 404 });
 
-  const headers = ['Namn', 'Telefon', 'Adress', 'Stad', 'Anställda', 'Omsättning', 'Google Betyg', 'Google Reviews', 'Google Maps', 'Källa', 'Score'];
+  const isWeakWebsite = job.mode === 'weak_website';
+  const headers = [
+    'Namn', 'Telefon', 'Adress', 'Stad', 'Anställda', 'Omsättning',
+    'Google Betyg', 'Google Reviews', 'Google Maps',
+    ...(isWeakWebsite ? ['Hemsida', 'Hemsidekvalitet'] : []),
+    'Källa', 'Score',
+  ];
   const rows = job.prospects.map(p => [
     p.name,
     p.phone ?? '',
@@ -22,6 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     p.googleRating ?? '',
     p.googleReviewsCount ?? '',
     p.mapsVerified ? (p.mapsUrl ?? 'Verifierad') : 'Ej hittad på Google',
+    ...(isWeakWebsite ? [p.websiteUrl ?? '', p.websiteQuality ?? ''] : []),
     p.source ?? '',
     p.priorityScore,
   ] as (string | number)[]);

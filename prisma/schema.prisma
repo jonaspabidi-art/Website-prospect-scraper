@@ -11,6 +11,7 @@ model ScrapeJob {
   industry    String
   city        String
   maxResults  Int       @default(20)
+  mode        String    @default("no_website") // no_website | weak_website
   status      String    @default("pending") // pending | running | completed | failed
   progress    String?
   error       String?
@@ -56,6 +57,8 @@ model Prospect {
   source             String?
   mapsVerified       Boolean   @default(false)
   mapsUrl            String?
+  websiteUrl         String?
+  websiteQuality     String?
   priorityScore      Int       @default(0)
   status             String    @default("Ny")
   inPipeline         Boolean   @default(false)

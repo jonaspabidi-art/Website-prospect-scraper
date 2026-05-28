@@ -13,4 +13,5 @@ export type ScrapeJobData = {
   industry: string;
   city: string;
   maxResults: number;
+  mode: 'no_website' | 'weak_website';
 };

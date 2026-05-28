@@ -18,6 +18,8 @@ type Prospect = {
   source: string | null;
   mapsVerified: boolean;
   mapsUrl: string | null;
+  websiteUrl: string | null;
+  websiteQuality: string | null;
   job: { industry: string; city: string };
 };
 
@@ -285,6 +287,13 @@ export default function ProspectsPage() {
                                   value={p.mapsVerified ? 'Öppna Maps' : 'Ej hittad på Google'}
                                   link={p.mapsVerified && p.mapsUrl ? p.mapsUrl : undefined}
                                 />
+                                {p.websiteUrl && (
+                                  <DetailRow
+                                    label="Hemsida"
+                                    value={`Öppna (${p.websiteQuality ?? '—'})`}
+                                    link={p.websiteUrl}
+                                  />
+                                )}
                               </dl>
                               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                                 <button onClick={() => setModal(p)} style={{ ...actionBtnStyle, background: 'var(--accent)', color: '#fff', border: 'none' }}>

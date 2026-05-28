@@ -27,6 +27,194 @@ async function haikusHasWebsite(pageText, companyName, source = 'hitta') {
   }
 }
 
+// ─── Free/low-quality platform indicators ─────────────────────────────────────
+
+const FREE_PLATFORMS = [
+  'wixsite.com', 'weebly.com', 'webnode.se', 'webnode.com',
+  'wordpress.com', 'squarespace.com', 'blogspot.com', 'jimdo.com',
+  'mystrikingly.com', 'pages.google.com',
+];
+
+// ─── Hitta.se website URL extractor (weak_website mode) ──────────────────────
+
+async function extractHittaWebsiteUrls(browser, candidates) {
+  const toCheck = candidates.filter(c => c.detail_url);
+  if (toCheck.length === 0) return [];
+  log(`\nExtraherar hemsidor: besöker ${toCheck.length} hitta.se-detaljsidor...`);
+
+  const page = await browser.newPage();
+  await page.setUserAgent(randomUA());
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.setRequestInterception(true);
+  page.on('request', req => {
+    if (['image', 'font', 'media'].includes(req.resourceType())) req.abort();
+    else req.continue();
+  });
+
+  const withWebsite = [];
+
+  for (const biz of toCheck) {
+    try {
+      await page.goto(biz.detail_url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      await delay(600);
+
+      const result = await page.evaluate(() => {
+        let websiteUrl = '';
+
+        // 1. exitUrl in redirect/proxy link (most common: "Besök hemsida" button)
+        const exitA = Array.from(document.querySelectorAll('a[href]')).find(a =>
+          a.href.includes('exitUrl') || (a.href.includes('/redir') && !a.href.includes('revealNumber'))
+        );
+        if (exitA) {
+          const m = exitA.href.match(/exitUrl=([^&]+)/);
+          if (m) { try { websiteUrl = decodeURIComponent(m[1]); } catch { websiteUrl = m[1]; } }
+        }
+
+        // 2. Link with text "hemsida" pointing to external domain
+        if (!websiteUrl) {
+          const websiteLink = Array.from(document.querySelectorAll('a[href]')).find(a => {
+            const t = (a.textContent || '').toLowerCase();
+            const h = a.href || '';
+            return (t.includes('hemsida') || t.includes('webbplats')) &&
+              h.startsWith('http') && !h.includes('hitta.se') && h.length > 15;
+          });
+          if (websiteLink) websiteUrl = websiteLink.href;
+        }
+
+        // 3. URL pattern in text near "hemsida"/"webbplats"
+        if (!websiteUrl) {
+          const text = document.body.innerText;
+          const pats = [
+            /hemsida\s*:?\s*(https?:\/\/[^\s\n]{4,})/i,
+            /webbplats\s*:?\s*(https?:\/\/[^\s\n]{4,})/i,
+            /hemsida\s*:?\s*(www\.[^\s\n]{4,})/i,
+          ];
+          for (const p of pats) {
+            const m = text.match(p);
+            if (m) { websiteUrl = m[1].startsWith('www') ? 'http://' + m[1] : m[1]; break; }
+          }
+        }
+
+        const orgMatch = document.body.innerText.match(/(\d{6}-\d{4})/);
+        return { websiteUrl, orgNumber: orgMatch ? orgMatch[1] : '' };
+      });
+
+      if (result.websiteUrl) {
+        log(`  ✓ ${biz.name} — ${result.websiteUrl}`);
+        withWebsite.push({
+          ...biz,
+          has_website: true,
+          website_url: result.websiteUrl,
+          org_number: result.orgNumber || biz.org_number,
+        });
+      } else {
+        log(`  ~ ${biz.name} — ingen hemsida-länk hittad`);
+      }
+    } catch (err) {
+      log(`  ? ${biz.name} — fel: ${err.message.split('\n')[0]}`);
+    }
+    await delay(700 + Math.random() * 300);
+  }
+
+  await page.close();
+  log(`Hitta-hemsidor: ${withWebsite.length}/${toCheck.length} med hittad URL`);
+  return withWebsite;
+}
+
+// ─── Website quality checker (weak_website mode) ─────────────────────────────
+
+async function checkWebsiteQuality(browser, candidates) {
+  if (candidates.length === 0) return [];
+  log(`\nHemsidekvalitet: kollar ${candidates.length} hemsidor...`);
+
+  const page = await browser.newPage();
+  await page.setUserAgent(randomUA());
+  await page.setViewport({ width: 390, height: 844 }); // Mobile viewport for accurate check
+  await page.setRequestInterception(true);
+  page.on('request', req => {
+    if (['image', 'font', 'media'].includes(req.resourceType())) req.abort();
+    else req.continue();
+  });
+
+  const results = [];
+
+  for (const biz of candidates) {
+    if (!biz.website_url) {
+      results.push({ ...biz, website_quality: 'unknown', website_signals: [] });
+      continue;
+    }
+
+    const signals = [];
+    let quality = 'ok';
+
+    // Instant checks from URL (no page visit needed)
+    if (FREE_PLATFORMS.some(p => biz.website_url.includes(p))) signals.push('Gratis plattform');
+    if (biz.website_url.startsWith('http://')) signals.push('Ingen HTTPS');
+
+    try {
+      const t0 = Date.now();
+      await page.goto(biz.website_url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      const loadMs = Date.now() - t0;
+      await delay(400);
+
+      if (loadMs > 8000) signals.push(`Långsam (${Math.round(loadMs / 1000)}s)`);
+
+      const data = await page.evaluate(() => {
+        const hasViewport = !!document.querySelector('meta[name="viewport"]');
+        const text = document.body.innerText || '';
+        const yearM = text.match(/©\s*(\d{4})|[Cc]opyright\s*©?\s*(\d{4})/);
+        const copyrightYear = yearM ? parseInt(yearM[1] || yearM[2]) : 0;
+        return { hasViewport, copyrightYear, pageText: text.slice(0, 3000) };
+      });
+
+      if (!data.hasViewport) signals.push('Ej mobilanpassad');
+      if (data.copyrightYear > 0 && data.copyrightYear <= 2020) {
+        signals.push(`Föråldrad (© ${data.copyrightYear})`);
+      }
+
+      // Haiku evaluates visible content
+      if (process.env.ANTHROPIC_API_KEY) {
+        try {
+          const msg = await anthropic.messages.create({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 5,
+            messages: [{
+              role: 'user',
+              content: `Titta på texten nedan från "${biz.name}"s hemsida.\nÄr hemsidan professionell och modern, eller ser den gammal, amatörmässig, innehållslös eller bristfällig ut?\nSvara bara "bra", "okej" eller "dålig".\n\n${data.pageText}`,
+            }],
+          });
+          const ans = (msg.content[0]?.text || '').toLowerCase().trim();
+          if (ans.startsWith('d')) { signals.push('Haiku: dålig'); quality = 'poor'; }
+          else if (ans.startsWith('b')) { quality = 'good'; }
+        } catch (err) {
+          log(`  Haiku-fel hemsida "${biz.name}": ${err.message.split('\n')[0]}`);
+        }
+      }
+
+      // Signal count decides quality if Haiku didn't
+      if (quality !== 'good' && quality !== 'poor') {
+        quality = signals.length >= 2 ? 'poor' : 'ok';
+      }
+
+      const sigStr = signals.length ? signals.join(', ') : 'inga varningar';
+      log(`  ${quality === 'poor' ? '✓' : quality === 'good' ? '✗' : '~'} ${biz.name} — ${quality} (${sigStr})`);
+
+    } catch (err) {
+      log(`  ? ${biz.name} — hemsida otillgänglig: ${err.message.split('\n')[0]}`);
+      signals.push('Otillgänglig');
+      quality = 'poor'; // Inaccessible site = worth contacting
+    }
+
+    results.push({ ...biz, website_quality: quality, website_signals: signals });
+    await delay(600 + Math.random() * 400);
+  }
+
+  await page.close();
+  const poor = results.filter(r => r.website_quality === 'poor').length;
+  log(`Hemsidekvalitet klar: ${poor}/${candidates.length} med dålig/föråldrad hemsida`);
+  return results;
+}
+
 // ─── City Coordinates ─────────────────────────────────────────────────────────
 
 const CITY_COORDS = {
@@ -151,7 +339,7 @@ function parseRevealPhone(href) {
 
 // ─── Hitta.se Scraper ─────────────────────────────────────────────────────────
 
-async function scrapeHitta(browser, industry, city, maxResults) {
+async function scrapeHitta(browser, industry, city, maxResults, mode = 'no_website') {
   log(`Scrapar hitta.se för "${industry}" i ${city}...`);
 
   const coords = getCityCoords(city);
@@ -253,7 +441,14 @@ async function scrapeHitta(browser, industry, city, maxResults) {
             const detailLink = card.querySelector('a[href*="/verksamhet/"]:not([href*="revealNumber"])');
             const detailUrl = detailLink ? detailLink.href : '';
 
-            items.push({ name, address, category, phoneHref, orgNumber, hasWebsite, websiteReason, detailUrl });
+            // Card-level URL extraction (best-effort; detail page gives accurate URL)
+            let websiteUrl = '';
+            const exitA = Array.from(card.querySelectorAll('a[href]')).find(a => a.href.includes('exitUrl'));
+            if (exitA) {
+              const m = exitA.href.match(/exitUrl=([^&]+)/);
+              if (m) { try { websiteUrl = decodeURIComponent(m[1]); } catch { websiteUrl = m[1]; } }
+            }
+            items.push({ name, address, category, phoneHref, orgNumber, hasWebsite, websiteReason, websiteUrl, detailUrl });
           } catch {}
         });
 
@@ -270,18 +465,26 @@ async function scrapeHitta(browser, industry, city, maxResults) {
         break;
       }
 
-      const noWebsite = pageData.items.filter(i => !i.hasWebsite);
-      const withWebsite = pageData.items.filter(i => i.hasWebsite);
-      log(`  hitta.se sida ${pageNum}: ${pageData.cardCount} kort, ${noWebsite.length} utan hemsida`);
-      for (const w of withWebsite) {
-        log(`  ~ ${w.name} — hemsida detekterad (${w.websiteReason})`);
+      // In weak_website mode we collect ALL items (URL extraction happens later via detail pages).
+      // In no_website mode we only collect items where the card shows no website.
+      const targetItems = mode === 'weak_website'
+        ? pageData.items
+        : pageData.items.filter(i => !i.hasWebsite);
+
+      if (mode === 'no_website') {
+        const withWebsite = pageData.items.filter(i => i.hasWebsite);
+        log(`  hitta.se sida ${pageNum}: ${pageData.cardCount} kort, ${targetItems.length} utan hemsida`);
+        for (const w of withWebsite) {
+          log(`  ~ ${w.name} — hemsida detekterad (${w.websiteReason})`);
+        }
+      } else {
+        log(`  hitta.se sida ${pageNum}: ${pageData.cardCount} kort, samlar alla för hemsidekoll`);
       }
 
-      for (const item of noWebsite) {
+      for (const item of targetItems) {
         if (results.length >= maxResults) break;
 
-        // Soft industry check: if a category was extracted and clearly doesn't relate
-        // to the requested industry, skip it. This filters out adjacent-category noise.
+        // Soft industry check
         if (item.category) {
           const norm = s => s.toLowerCase().replace(/[åä]/g, 'a').replace(/ö/g, 'o').replace(/[^a-z0-9 ]/g, '');
           const cat = norm(item.category);
@@ -301,7 +504,8 @@ async function scrapeHitta(browser, industry, city, maxResults) {
           address: item.address,
           category: item.category,
           org_number: item.orgNumber,
-          has_website: false,
+          has_website: mode === 'weak_website' ? (item.hasWebsite || false) : false,
+          website_url: item.websiteUrl || '',
           detail_url: item.detailUrl,
           source: 'hitta',
         });
@@ -325,13 +529,13 @@ async function scrapeHitta(browser, industry, city, maxResults) {
   }
 
   await page.close();
-  log(`hitta.se klart: ${results.length} bekräftade företag utan hemsida`);
+  log(`hitta.se klart: ${results.length} ${mode === 'weak_website' ? 'kandidater för hemsidekoll' : 'bekräftade företag utan hemsida'}`);
   return results;
 }
 
 // ─── Google Maps Scraper ──────────────────────────────────────────────────────
 
-async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResults = []) {
+async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResults = [], mode = 'no_website') {
   log(`Scrapar Google Maps för "${industry}" i ${city}...`);
   const googleProspects = [];
   const confirmedHasWebsite = new Set();
@@ -440,7 +644,18 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
             if (m) reviewCount = parseInt(m[0].replace(/\s/g, '')) || 0;
           }
 
-          return { name, address, phone, has_website: hasWebsite, google_rating: rating, google_reviews_count: reviewCount, pageText: document.body.innerText.slice(0, 3000) };
+          // Extract website URL when present (used by weak_website mode)
+          let websiteUrl = '';
+          if (hasWebsite) {
+            const authEl = document.querySelector('[data-item-id="authority"]');
+            if (authEl) websiteUrl = authEl.href || (authEl.querySelector('a') || {}).href || '';
+            if (!websiteUrl) {
+              const ariaEl = document.querySelector('a[aria-label*="ebbplats"], a[aria-label*="ebsite"], a[aria-label*="Hemsida"]');
+              if (ariaEl) websiteUrl = ariaEl.href || '';
+            }
+          }
+
+          return { name, address, phone, has_website: hasWebsite, website_url: websiteUrl, google_rating: rating, google_reviews_count: reviewCount, pageText: document.body.innerText.slice(0, 3000) };
         });
 
         if (!data.name) { await delay(500); continue; }
@@ -452,15 +667,24 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
           if (hasWebsite) log(`  ~ ${data.name} — hemsida hittad av Haiku på Maps`);
         }
 
-        if (hasWebsite) {
-          const matched = hittaResults.find(h => namesMatch(h.name, data.name));
-          if (matched) {
-            confirmedHasWebsite.add(normalize(matched.name));
-            log(`  ✗ ${data.name} — har hemsida på Maps, tas bort från hitta-listan`);
+        if (mode === 'weak_website') {
+          // Collect companies WITH websites
+          if (hasWebsite && data.website_url) {
+            googleProspects.push({ ...data, source: 'google', maps_verified: true, maps_url: mapsUrl });
+            log(`  ✓ ${data.name} — ${data.website_url}`);
           }
         } else {
-          googleProspects.push({ ...data, source: 'google', maps_verified: true, maps_url: mapsUrl });
-          log(`  ✓ ${data.name} | ${data.phone} | ${data.google_reviews_count} rec, ${data.google_rating}★`);
+          // no_website: cross-verify hitta candidates and collect Maps-only prospects
+          if (hasWebsite) {
+            const matched = hittaResults.find(h => namesMatch(h.name, data.name));
+            if (matched) {
+              confirmedHasWebsite.add(normalize(matched.name));
+              log(`  ✗ ${data.name} — har hemsida på Maps, tas bort från hitta-listan`);
+            }
+          } else {
+            googleProspects.push({ ...data, source: 'google', maps_verified: true, maps_url: mapsUrl });
+            log(`  ✓ ${data.name} | ${data.phone} | ${data.google_reviews_count} rec, ${data.google_rating}★`);
+          }
         }
 
         await delay(800 + Math.random() * 400);
@@ -1008,6 +1232,7 @@ function mergeResults(hittaResults, googleResults) {
 function calculateScore(biz) {
   let score = 0;
   if (!biz.has_website) score += 3;
+  else if (biz.website_quality === 'poor') score += 2;
   if (!biz.maps_verified) score -= 2;
   if (biz.revenue > 5_000_000) score += 4;
   else if (biz.revenue >= 1_000_000) score += 3;
@@ -1029,14 +1254,12 @@ function calculateScore(biz) {
 
 // ─── Exported runner ─────────────────────────────────────────────────────────
 
-async function runScraper({ industry, city, maxResults = 20, onProgress = () => {} }) {
+async function runScraper({ industry, city, maxResults = 20, mode = 'no_website', onProgress = () => {} }) {
   _logFn = (msg) => { onProgress(msg); };
 
-  // Scrape 3× more candidates than requested so we can score all of them
-  // and return only the best N — not just the first N found.
   const scrapeLimit = Math.min(maxResults * 3, 60);
-
-  log(`Prospektering: ${industry} i ${city} (samlar ${scrapeLimit} kandidater, returnerar topp ${maxResults})`);
+  const modeLabel = mode === 'weak_website' ? 'svag hemsida' : 'utan hemsida';
+  log(`Prospektering: ${industry} i ${city} — läge: ${modeLabel} (samlar ${scrapeLimit} kandidater, returnerar topp ${maxResults})`);
 
   const browser = await puppeteer.launch({
     headless: 'new',
@@ -1052,7 +1275,76 @@ async function runScraper({ industry, city, maxResults = 20, onProgress = () => 
 
   await browser.defaultBrowserContext().overridePermissions('https://www.hitta.se', []);
 
+  // City filter helper — shared by both modes
+  const cityNorm = normalize(city);
+  const acceptedLocations = new Set([cityNorm, 'gothenburg', 'goteborg']);
+  for (const [area, parent] of Object.entries(CITY_VAR_OVERRIDE)) {
+    if (normalize(parent) === cityNorm) acceptedLocations.add(normalize(area));
+  }
+  const cityFilterFn = (b) => {
+    if (!b.address) return true;
+    const addr = normalize(b.address);
+    if (Array.from(acceptedLocations).some(loc => addr.includes(loc))) return true;
+    log(`  ✗ ${b.name} — adress "${b.address}" matchar inte ${city}`);
+    return false;
+  };
+
   try {
+    // ── weak_website mode ──────────────────────────────────────────────────────
+    if (mode === 'weak_website') {
+      // Step 1: Collect all candidates from hitta.se (we filter by URL presence later)
+      const hittaAll = await scrapeHitta(browser, industry, city, scrapeLimit, 'weak_website');
+      await randomDelay();
+
+      // Step 2: Visit hitta.se detail pages to extract actual website URLs
+      const hittaWithUrls = await extractHittaWebsiteUrls(browser, hittaAll);
+      await randomDelay();
+
+      // Step 3: Collect companies with websites from Google Maps
+      const { googleProspects: googleWithWebsite } = await scrapeGoogleMaps(
+        browser, industry, city, maxResults, [], 'weak_website'
+      );
+
+      // Step 4: Address filter
+      const filteredHitta = hittaWithUrls.filter(cityFilterFn);
+      const filteredGoogle = googleWithWebsite.filter(cityFilterFn);
+      const removedByCity = (hittaWithUrls.length + googleWithWebsite.length) - (filteredHitta.length + filteredGoogle.length);
+      if (removedByCity > 0) log(`Adressfilter: ${removedByCity} bolag borttagna (fel stad)`);
+
+      // Step 5: Merge and de-duplicate
+      const merged = mergeResults(filteredHitta, filteredGoogle);
+      if (merged.length === 0) {
+        log('Inga bolag med hemsida hittades.');
+        return [];
+      }
+
+      // Step 6: Check website quality — only keep 'poor' ones
+      const qualityChecked = await checkWebsiteQuality(browser, merged);
+      const poorWebsite = qualityChecked.filter(c => c.website_quality === 'poor');
+      if (poorWebsite.length === 0) {
+        log('Inga bolag med dålig hemsida hittades.');
+        return [];
+      }
+
+      // Step 7: Enrich with allabolag
+      const enriched = await enrichWithAllabolag(browser, poorWebsite);
+      const enrichedFiltered = enriched.filter(b => {
+        if (b.employees && b.employees > 20) {
+          log(`  ✗ ${b.name} — för stor aktör (${b.employees} anst.), tas bort`);
+          return false;
+        }
+        return true;
+      });
+
+      log('Beräknar prioritetspoäng...');
+      const scored = enrichedFiltered.map(b => ({ ...b, priority_score: calculateScore(b) }));
+      scored.sort((a, b) => b.priority_score - a.priority_score);
+      const topResults = scored.slice(0, maxResults);
+      log(`KLAR! Returnerar topp ${topResults.length} av ${scored.length} bolag med dålig hemsida.`);
+      return topResults;
+    }
+
+    // ── no_website mode (default) ──────────────────────────────────────────────
     const hittaResults = await scrapeHitta(browser, industry, city, scrapeLimit);
     await randomDelay();
 
@@ -1063,26 +1355,9 @@ async function runScraper({ industry, city, maxResults = 20, onProgress = () => 
     }
     const filteredHitta = hittaResults.filter(h => !confirmedHasWebsite.has(normalize(h.name)));
 
-    // Pass 2: visit hitta.se detail pages for remaining candidates
     const verifiedHitta = await verifyHittaDetails(browser, filteredHitta);
-
-    // Pass 3: targeted per-company Google Maps check
     const mapsVerifiedHitta = await verifyHittaCandidatesOnMaps(browser, verifiedHitta, city);
 
-    // Address filter: remove prospects clearly outside the searched city.
-    // Also accept known sub-areas (e.g. "Hisings Backa" for a Göteborg search).
-    const cityNorm = normalize(city);
-    const acceptedLocations = new Set([cityNorm, 'gothenburg', 'goteborg']);
-    for (const [area, parent] of Object.entries(CITY_VAR_OVERRIDE)) {
-      if (normalize(parent) === cityNorm) acceptedLocations.add(normalize(area));
-    }
-    const cityFilterFn = (b) => {
-      if (!b.address) return true;
-      const addr = normalize(b.address);
-      if (Array.from(acceptedLocations).some(loc => addr.includes(loc))) return true;
-      log(`  ✗ ${b.name} — adress "${b.address}" matchar inte ${city}`);
-      return false;
-    };
     const filteredHittaByCity = mapsVerifiedHitta.filter(cityFilterFn);
     const filteredGoogleByCity = googleProspects.filter(cityFilterFn);
     const removedByCity = (mapsVerifiedHitta.length + googleProspects.length) - (filteredHittaByCity.length + filteredGoogleByCity.length);
@@ -1097,15 +1372,12 @@ async function runScraper({ industry, city, maxResults = 20, onProgress = () => 
 
     const enriched = await enrichWithAllabolag(browser, merged);
 
-    const MAX_EMPLOYEES = 20;
-
-    // Filter out any prospect where allabolag confirmed a website (pass 3)
     const enrichedFiltered = enriched.filter(b => {
       if (b.website_found) {
         log(`  ✗ ${b.name} — webbplats bekräftad på allabolag, tas bort`);
         return false;
       }
-      if (b.employees && b.employees > MAX_EMPLOYEES) {
+      if (b.employees && b.employees > 20) {
         log(`  ✗ ${b.name} — för stor aktör (${b.employees} anst.), tas bort`);
         return false;
       }
@@ -1115,8 +1387,6 @@ async function runScraper({ industry, city, maxResults = 20, onProgress = () => 
     log('Beräknar prioritetspoäng...');
     const scored = enrichedFiltered.map(b => ({ ...b, priority_score: calculateScore(b) }));
     scored.sort((a, b) => b.priority_score - a.priority_score);
-
-    // Return only the top N after scoring across all candidates
     const topResults = scored.slice(0, maxResults);
     log(`KLAR! Returnerar topp ${topResults.length} av ${scored.length} undersökta prospekt.`);
     return topResults;
