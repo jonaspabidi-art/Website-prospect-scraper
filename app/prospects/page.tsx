@@ -20,6 +20,7 @@ type Prospect = {
   mapsUrl: string | null;
   websiteUrl: string | null;
   websiteQuality: string | null;
+  websiteSignals: string | null;
   job: { industry: string; city: string };
 };
 
@@ -295,11 +296,27 @@ export default function ProspectsPage() {
                                   link={p.mapsVerified && p.mapsUrl ? p.mapsUrl : undefined}
                                 />
                                 {p.websiteUrl && (
-                                  <DetailRow
-                                    label="Hemsida"
-                                    value={`Öppna (${p.websiteQuality ?? '—'})`}
-                                    link={p.websiteUrl}
-                                  />
+                                  <>
+                                    <DetailRow
+                                      label="Hemsida"
+                                      value="Öppna"
+                                      link={p.websiteUrl}
+                                    />
+                                    {p.websiteSignals && (
+                                      <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: 12, padding: '6px 0', fontSize: 13 }}>
+                                        <dt style={{ color: 'var(--text-muted)' }}>Varningar</dt>
+                                        <dd style={{ margin: 0, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                          {p.websiteSignals.split(' · ').map(s => (
+                                            <span key={s} style={{
+                                              fontSize: 11, padding: '2px 7px', borderRadius: 'var(--r-pill)',
+                                              background: 'var(--red-soft)', color: 'var(--red)', border: '1px solid var(--red-border)',
+                                              fontWeight: 500,
+                                            }}>{s}</span>
+                                          ))}
+                                        </dd>
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               </dl>
                               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>

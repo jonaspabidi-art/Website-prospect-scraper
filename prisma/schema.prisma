@@ -59,6 +59,7 @@ model Prospect {
   mapsUrl            String?
   websiteUrl         String?
   websiteQuality     String?
+  websiteSignals     String?
   priorityScore      Int       @default(0)
   status             String    @default("Ny")
   inPipeline         Boolean   @default(false)

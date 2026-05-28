@@ -68,6 +68,7 @@ const worker = new Worker<ScrapeJobData>(
         mapsUrl: r.maps_url ?? null,
         websiteUrl: r.website_url ?? null,
         websiteQuality: r.website_quality ?? null,
+        websiteSignals: r.website_signals?.length ? r.website_signals.join(' · ') : null,
         priorityScore: r.priority_score || 0,
       })),
     });

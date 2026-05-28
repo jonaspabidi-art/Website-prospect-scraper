@@ -15,6 +15,7 @@ type Prospect = {
   inPipeline: boolean;
   websiteUrl: string | null;
   websiteQuality: string | null;
+  websiteSignals: string | null;
 };
 
 type Job = {
@@ -160,9 +161,14 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
                       <div className="font-medium">{p.name}</div>
                       {p.address && <div className="text-xs text-gray-400">{p.address}</div>}
                       {p.websiteUrl && (
-                        <a href={p.websiteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none' }}>
-                          Hemsida {p.websiteQuality ? `(${p.websiteQuality})` : ''}
-                        </a>
+                        <div style={{ marginTop: 2 }}>
+                          <a href={p.websiteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none' }}>
+                            Hemsida
+                          </a>
+                          {p.websiteSignals && (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>{p.websiteSignals}</span>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td className="px-4 py-3">
