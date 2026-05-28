@@ -24,11 +24,17 @@ const worker = new Worker<ScrapeJobData>(
 
     const existing = await prisma.prospect.findMany({
       where: { city: { contains: city, mode: 'insensitive' } },
-      select: { name: true },
+      select: { name: true, phone: true },
     });
     const skipNames = new Set(existing.map((e: { name: string }) => e.name.toLowerCase()));
+    const skipPhones = new Set(
+      existing
+        .filter((e: { phone: string | null }) => e.phone)
+        .map((e: { phone: string | null }) => (e.phone || '').replace(/\D/g, '').slice(-9))
+        .filter((p: string) => p.length >= 8)
+    );
     if (skipNames.size > 0) {
-      logs.push(`Minne: ${skipNames.size} bolag i ${city} redan sparade, hoppar över dessa`);
+      logs.push(`Minne: ${skipNames.size} bolag i ${city} redan sparade (${skipPhones.size} telefoner), hoppar över dessa`);
     }
 
     const results = await runScraper({
@@ -37,6 +43,7 @@ const worker = new Worker<ScrapeJobData>(
       maxResults,
       mode,
       skipNames,
+      skipPhones,
       onProgress: async (msg: string) => {
         logs.push(msg);
         await prisma.scrapeJob.update({

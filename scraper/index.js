@@ -366,7 +366,7 @@ function parseRevealPhone(href) {
 
 // ─── Hitta.se Scraper ─────────────────────────────────────────────────────────
 
-async function scrapeHitta(browser, industry, city, maxResults, mode = 'no_website', skipNames = new Set()) {
+async function scrapeHitta(browser, industry, city, maxResults, mode = 'no_website', skipNames = new Set(), skipPhones = new Set()) {
   log(`Scrapar hitta.se för "${industry}" i ${city}...`);
 
   const coords = getCityCoords(city);
@@ -516,6 +516,12 @@ async function scrapeHitta(browser, industry, city, maxResults, mode = 'no_websi
           continue;
         }
 
+        const itemPhone = parseRevealPhone(item.phoneHref).replace(/\D/g, '').slice(-9);
+        if (itemPhone && itemPhone.length >= 8 && skipPhones.has(itemPhone)) {
+          log(`  ~ ${item.name} — telefon redan sparad, hoppar över`);
+          continue;
+        }
+
         // Soft industry check
         if (item.category) {
           const norm = s => s.toLowerCase().replace(/[åä]/g, 'a').replace(/ö/g, 'o').replace(/[^a-z0-9 ]/g, '');
@@ -567,7 +573,7 @@ async function scrapeHitta(browser, industry, city, maxResults, mode = 'no_websi
 
 // ─── Google Maps Scraper ──────────────────────────────────────────────────────
 
-async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResults = [], mode = 'no_website') {
+async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResults = [], mode = 'no_website', skipPhones = new Set()) {
   log(`Scrapar Google Maps för "${industry}" i ${city}...`);
   const googleProspects = [];
   const confirmedHasWebsite = new Set();
@@ -699,11 +705,17 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
           if (hasWebsite) log(`  ~ ${data.name} — hemsida hittad av Haiku på Maps`);
         }
 
+        const mapsPhone = (data.phone || '').replace(/\D/g, '').slice(-9);
+        const phoneKnown = mapsPhone && mapsPhone.length >= 8 && skipPhones.has(mapsPhone);
+
         if (mode === 'weak_website') {
           // Collect companies WITH websites
           if (hasWebsite && data.website_url) {
-            googleProspects.push({ ...data, source: 'google', maps_verified: true, maps_url: mapsUrl });
-            log(`  ✓ ${data.name} — ${data.website_url}`);
+            if (phoneKnown) { log(`  ~ ${data.name} — telefon redan sparad, hoppar över`); }
+            else {
+              googleProspects.push({ ...data, source: 'google', maps_verified: true, maps_url: mapsUrl });
+              log(`  ✓ ${data.name} — ${data.website_url}`);
+            }
           }
         } else {
           // no_website: cross-verify hitta candidates and collect Maps-only prospects
@@ -713,6 +725,8 @@ async function scrapeGoogleMaps(browser, industry, city, maxResults, hittaResult
               confirmedHasWebsite.add(normalize(matched.name));
               log(`  ✗ ${data.name} — har hemsida på Maps, tas bort från hitta-listan`);
             }
+          } else if (phoneKnown) {
+            log(`  ~ ${data.name} — telefon redan sparad, hoppar över`);
           } else {
             googleProspects.push({ ...data, source: 'google', maps_verified: true, maps_url: mapsUrl });
             log(`  ✓ ${data.name} | ${data.phone} | ${data.google_reviews_count} rec, ${data.google_rating}★`);
@@ -1286,7 +1300,7 @@ function calculateScore(biz) {
 
 // ─── Exported runner ─────────────────────────────────────────────────────────
 
-async function runScraper({ industry, city, maxResults = 20, mode = 'no_website', onProgress = () => {}, skipNames = new Set() }) {
+async function runScraper({ industry, city, maxResults = 20, mode = 'no_website', onProgress = () => {}, skipNames = new Set(), skipPhones = new Set() }) {
   _logFn = (msg) => { onProgress(msg); };
 
   const scrapeLimit = Math.min(maxResults * 3, 60);
@@ -1324,42 +1338,72 @@ async function runScraper({ industry, city, maxResults = 20, mode = 'no_website'
   try {
     // ── weak_website mode ──────────────────────────────────────────────────────
     if (mode === 'weak_website') {
-      // Step 1: Collect all candidates from hitta.se (we filter by URL presence later)
-      const hittaAll = await scrapeHitta(browser, industry, city, scrapeLimit, 'weak_website', skipNames);
-      await randomDelay();
+      const TARGET = Math.ceil(maxResults * 1.5); // aim for 30 before allabolag filter
+      const allPoor = [];
+      const allPoorNames = new Set();
+      // runSeenNames: DB names + this run's collected names — prevents hitta from re-collecting
+      const runSeenNames = new Set([...skipNames]);
 
-      // Step 2: Visit hitta.se detail pages to extract actual website URLs
-      const hittaWithUrls = await extractHittaWebsiteUrls(browser, hittaAll);
-      await randomDelay();
-
-      // Step 3: Collect companies with websites from Google Maps
+      // Step 1: Google Maps once (popular businesses first)
       const { googleProspects: googleWithWebsite } = await scrapeGoogleMaps(
-        browser, industry, city, maxResults, [], 'weak_website'
+        browser, industry, city, maxResults, [], 'weak_website', skipPhones
       );
-
-      // Step 4: Address filter
-      const filteredHitta = hittaWithUrls.filter(cityFilterFn);
+      await randomDelay();
       const filteredGoogle = googleWithWebsite.filter(cityFilterFn);
-      const removedByCity = (hittaWithUrls.length + googleWithWebsite.length) - (filteredHitta.length + filteredGoogle.length);
-      if (removedByCity > 0) log(`Adressfilter: ${removedByCity} bolag borttagna (fel stad)`);
-
-      // Step 5: Merge and de-duplicate
-      const merged = mergeResults(filteredHitta, filteredGoogle);
-      if (merged.length === 0) {
-        log('Inga bolag med hemsida hittades.');
-        return [];
+      if (filteredGoogle.length > 0) {
+        const googleQuality = await checkWebsiteQuality(browser, filteredGoogle);
+        for (const b of googleQuality) {
+          if (b.website_quality === 'poor' && !allPoorNames.has(normalize(b.name))) {
+            allPoorNames.add(normalize(b.name));
+            runSeenNames.add(normalize(b.name));
+            allPoor.push(b);
+          }
+        }
+        log(`Google Maps bidrog: ${allPoor.length} dåliga hemsidor`);
       }
 
-      // Step 6: Check website quality — only keep 'poor' ones
-      const qualityChecked = await checkWebsiteQuality(browser, merged);
-      const poorWebsite = qualityChecked.filter(c => c.website_quality === 'poor');
-      if (poorWebsite.length === 0) {
+      // Step 2: Hitta.se — paginate in batches until TARGET reached
+      // runSeenNames grows each batch so scrapeHitta naturally advances through pages
+      const BATCH = 25;
+      const MAX_ITERS = 5;
+
+      for (let iter = 0; iter < MAX_ITERS && allPoor.length < TARGET; iter++) {
+        log(`\nHitta-batch ${iter + 1}...`);
+        const hittaBatch = await scrapeHitta(
+          browser, industry, city, BATCH, 'weak_website', runSeenNames, skipPhones
+        );
+        if (hittaBatch.length === 0) { log('Inga fler hitta-resultat, avslutar.'); break; }
+
+        // Add batch to runSeenNames so next iteration skips these and advances
+        for (const b of hittaBatch) runSeenNames.add(normalize(b.name));
+
+        await randomDelay();
+        const withUrls = await extractHittaWebsiteUrls(browser, hittaBatch);
+        const filtered = withUrls.filter(cityFilterFn);
+        if (filtered.length === 0) {
+          log(`Hitta-batch ${iter + 1}: inga hemsidor hittades, fortsätter...`);
+          continue;
+        }
+
+        const qualityChecked = await checkWebsiteQuality(browser, filtered);
+        let added = 0;
+        for (const b of qualityChecked) {
+          if (b.website_quality === 'poor' && !allPoorNames.has(normalize(b.name))) {
+            allPoorNames.add(normalize(b.name));
+            allPoor.push(b);
+            added++;
+          }
+        }
+        log(`Hitta-batch ${iter + 1}: +${added} dåliga → totalt ${allPoor.length}/${TARGET}`);
+      }
+
+      if (allPoor.length === 0) {
         log('Inga bolag med dålig hemsida hittades.');
         return [];
       }
 
-      // Step 7: Enrich with allabolag
-      const enriched = await enrichWithAllabolag(browser, poorWebsite);
+      // Step 3: Enrich with allabolag
+      const enriched = await enrichWithAllabolag(browser, allPoor);
       const enrichedFiltered = enriched.filter(b => {
         if (b.revenue && b.revenue > 50_000_000) {
           log(`  ✗ ${b.name} — för hög omsättning (${Math.round(b.revenue / 1_000_000)}M kr), tas bort`);
@@ -1381,10 +1425,10 @@ async function runScraper({ industry, city, maxResults = 20, mode = 'no_website'
     }
 
     // ── no_website mode (default) ──────────────────────────────────────────────
-    const hittaResults = await scrapeHitta(browser, industry, city, scrapeLimit, 'no_website', skipNames);
+    const hittaResults = await scrapeHitta(browser, industry, city, scrapeLimit, 'no_website', skipNames, skipPhones);
     await randomDelay();
 
-    const { googleProspects, confirmedHasWebsite } = await scrapeGoogleMaps(browser, industry, city, maxResults, hittaResults);
+    const { googleProspects, confirmedHasWebsite } = await scrapeGoogleMaps(browser, industry, city, maxResults, hittaResults, 'no_website', skipPhones);
 
     if (confirmedHasWebsite.size > 0) {
       log(`Filtrerar: ${confirmedHasWebsite.size} hitta-bolag bekräftade med hemsida tas bort`);
