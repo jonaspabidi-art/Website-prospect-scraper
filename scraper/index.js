@@ -339,7 +339,7 @@ function parseRevealPhone(href) {
 
 // ─── Hitta.se Scraper ─────────────────────────────────────────────────────────
 
-async function scrapeHitta(browser, industry, city, maxResults, mode = 'no_website') {
+async function scrapeHitta(browser, industry, city, maxResults, mode = 'no_website', skipNames = new Set()) {
   log(`Scrapar hitta.se för "${industry}" i ${city}...`);
 
   const coords = getCityCoords(city);
@@ -483,6 +483,11 @@ async function scrapeHitta(browser, industry, city, maxResults, mode = 'no_websi
 
       for (const item of targetItems) {
         if (results.length >= maxResults) break;
+
+        if (skipNames.has((item.name || '').toLowerCase())) {
+          log(`  ~ ${item.name} — redan sparad, hoppar över`);
+          continue;
+        }
 
         // Soft industry check
         if (item.category) {
@@ -1254,7 +1259,7 @@ function calculateScore(biz) {
 
 // ─── Exported runner ─────────────────────────────────────────────────────────
 
-async function runScraper({ industry, city, maxResults = 20, mode = 'no_website', onProgress = () => {} }) {
+async function runScraper({ industry, city, maxResults = 20, mode = 'no_website', onProgress = () => {}, skipNames = new Set() }) {
   _logFn = (msg) => { onProgress(msg); };
 
   const scrapeLimit = Math.min(maxResults * 3, 60);
@@ -1293,7 +1298,7 @@ async function runScraper({ industry, city, maxResults = 20, mode = 'no_website'
     // ── weak_website mode ──────────────────────────────────────────────────────
     if (mode === 'weak_website') {
       // Step 1: Collect all candidates from hitta.se (we filter by URL presence later)
-      const hittaAll = await scrapeHitta(browser, industry, city, scrapeLimit, 'weak_website');
+      const hittaAll = await scrapeHitta(browser, industry, city, scrapeLimit, 'weak_website', skipNames);
       await randomDelay();
 
       // Step 2: Visit hitta.se detail pages to extract actual website URLs
@@ -1345,7 +1350,7 @@ async function runScraper({ industry, city, maxResults = 20, mode = 'no_website'
     }
 
     // ── no_website mode (default) ──────────────────────────────────────────────
-    const hittaResults = await scrapeHitta(browser, industry, city, scrapeLimit);
+    const hittaResults = await scrapeHitta(browser, industry, city, scrapeLimit, 'no_website', skipNames);
     await randomDelay();
 
     const { googleProspects, confirmedHasWebsite } = await scrapeGoogleMaps(browser, industry, city, maxResults, hittaResults);

@@ -22,11 +22,21 @@ const worker = new Worker<ScrapeJobData>(
 
     const logs: string[] = [];
 
+    const existing = await prisma.prospect.findMany({
+      where: { city: { contains: city, mode: 'insensitive' } },
+      select: { name: true },
+    });
+    const skipNames = new Set(existing.map((e: { name: string }) => e.name.toLowerCase()));
+    if (skipNames.size > 0) {
+      logs.push(`Minne: ${skipNames.size} bolag i ${city} redan sparade, hoppar över dessa`);
+    }
+
     const results = await runScraper({
       industry,
       city,
       maxResults,
       mode,
+      skipNames,
       onProgress: async (msg: string) => {
         logs.push(msg);
         await prisma.scrapeJob.update({
@@ -36,21 +46,8 @@ const worker = new Worker<ScrapeJobData>(
       },
     });
 
-    const existing = await prisma.prospect.findMany({
-      where: { city: { contains: city, mode: 'insensitive' } },
-      select: { name: true },
-    });
-    const existingNames = new Set(existing.map((e: { name: string }) => e.name.toLowerCase()));
-    const newResults = results.filter((r: any) => !existingNames.has((r.name || '').toLowerCase()));
-
-    logs.push(`${results.length} hittade · ${newResults.length} nya (${results.length - newResults.length} redan sparade)`);
-    await prisma.scrapeJob.update({
-      where: { id: jobId },
-      data: { progress: logs.slice(-50).join('\n') },
-    });
-
     await prisma.prospect.createMany({
-      data: newResults.map((r: any) => ({
+      data: results.map((r: any) => ({
         jobId,
         name: r.name,
         phone: r.phone || null,
