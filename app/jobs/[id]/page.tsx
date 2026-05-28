@@ -13,6 +13,8 @@ type Prospect = {
   source: string | null;
   priorityScore: number;
   inPipeline: boolean;
+  websiteUrl: string | null;
+  websiteQuality: string | null;
 };
 
 type Job = {
@@ -157,6 +159,11 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
                     <td className="px-5 py-3">
                       <div className="font-medium">{p.name}</div>
                       {p.address && <div className="text-xs text-gray-400">{p.address}</div>}
+                      {p.websiteUrl && (
+                        <a href={p.websiteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none' }}>
+                          Hemsida {p.websiteQuality ? `(${p.websiteQuality})` : ''}
+                        </a>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

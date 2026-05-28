@@ -56,6 +56,7 @@ export default function ProspectsPage() {
   const [industryFilter, setIndustryFilter] = useState('');
   const [cityFilter, setCityFilter] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState('');
 
   const fetchProspects = useCallback(async () => {
     const params = new URLSearchParams({ page: String(page) });
@@ -63,12 +64,13 @@ export default function ProspectsPage() {
     if (statusFilter) params.set('status', statusFilter);
     if (industryFilter) params.set('bransch', industryFilter);
     if (cityFilter) params.set('stad', cityFilter);
+    if (typeFilter) params.set('typ', typeFilter);
     const res = await fetch(`/api/prospects?${params}`);
     const data = await res.json();
     setProspects(data.prospects ?? []);
     setTotal(data.total ?? 0);
     setTotalPages(data.totalPages ?? 1);
-  }, [page, search, statusFilter, industryFilter, cityFilter]);
+  }, [page, search, statusFilter, industryFilter, cityFilter, typeFilter]);
 
   useEffect(() => { fetchProspects(); }, [fetchProspects]);
 
@@ -133,6 +135,11 @@ export default function ProspectsPage() {
         <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }} style={selectStyle}>
           <option value="">Status: alla</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(1); }} style={selectStyle}>
+          <option value="">Typ: alla</option>
+          <option value="no_website">Utan hemsida</option>
+          <option value="weak_website">Svag hemsida</option>
         </select>
         <div className="filter-search" style={{ position: 'relative', flex: 1, minWidth: 220 }}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"

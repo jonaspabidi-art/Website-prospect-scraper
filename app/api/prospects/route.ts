@@ -11,6 +11,7 @@ export async function GET(req: Request) {
   const limit = parseInt(searchParams.get('limit') || '25');
 
   const pipeline = searchParams.get('pipeline');
+  const typ = searchParams.get('typ') || '';
 
   const where = {
     ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
@@ -18,6 +19,8 @@ export async function GET(req: Request) {
     ...(pipeline === 'true' && { inPipeline: true }),
     ...(stad && { city: { contains: stad, mode: 'insensitive' as const } }),
     ...(bransch && { job: { industry: { contains: bransch, mode: 'insensitive' as const } } }),
+    ...(typ === 'weak_website' && { websiteUrl: { not: null } }),
+    ...(typ === 'no_website' && { websiteUrl: null }),
   };
 
   const [prospects, total] = await Promise.all([
