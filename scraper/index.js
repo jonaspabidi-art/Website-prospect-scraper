@@ -196,7 +196,7 @@ async function checkWebsiteQuality(browser, candidates) {
       // Haiku evaluates both screenshot and text
       if (process.env.ANTHROPIC_API_KEY) {
         try {
-          const prompt = `Du är webbutvecklare som letar efter företag med dåliga hemsidor att sälja om. Analysera hemsidan för "${biz.name}".\n\nSvara BARA "bra" eller "dålig".\n\nSvara "dålig" om hemsidan har NÅGOT av:\n- Lite eller inget innehåll, ser ut som en mall eller platshållare\n- Saknar tydlig beskrivning av tjänster\n- Ingen kontaktinfo eller kontaktformulär\n- Verkar föråldrad eller ej uppdaterad sedan länge\n- Amatörmässig eller rörig design/struktur\n\nSvara "bra" BARA om hemsidan tydligt har: modern design, tydliga tjänstebeskrivningar, kontaktinfo och ett professionellt helhetsintryck.\n\nSidtext:\n${data.pageText}`;
+          const prompt = `Du är webbutvecklare som bedömer om ett företag behöver en ny hemsida.\n\nAnalysera hemsidan för "${biz.name}". Svara BARA med ett ord: "bra" eller "dålig".\n\nSvara "bra" om hemsidan HAR MINST ETT av:\n• Onlinebeställning, onlinebokning eller fungerande e-handel\n• Modern, professionell design med tydliga tjänste- eller produktbeskrivningar OCH kontaktinfo\n• Uppenbara tecken på att sidan är nyligen uppdaterad (nyheter, aktuella priser, copyright 2022+)\n• Kedja, franchise eller etablerad nationell aktör med flera lokaler\n\nSvara "dålig" om hemsidan TYDLIGT lider av MINST TVÅ av:\n• Nästan inget innehåll — under 200 ord, inga tjänstebeskrivningar, ingen prislista\n• Föråldrad design — tabellayout, pixelgrafik, copyright 2020 eller äldre\n• Ingen kontaktinformation (telefonnummer, adress eller e-post saknas helt)\n• Inga bilder av verksamheten (produkter, lokal eller personal)\n• Mobilvy ser trasig ut eller saknas helt\n• Det är en Facebook-/Instagram-sida, Google My Business-sida eller tredjepartskatalog\n\nOm du är osäker eller sidan verkar "okej men inte fantastisk" — svara "bra". Bättre att missa ett lead än att kontakta någon som har en fungerande sida.\n\nSidtext:\n${data.pageText}`;
 
           const content = screenshotB64
             ? [
@@ -1361,6 +1361,10 @@ async function runScraper({ industry, city, maxResults = 20, mode = 'no_website'
       // Step 7: Enrich with allabolag
       const enriched = await enrichWithAllabolag(browser, poorWebsite);
       const enrichedFiltered = enriched.filter(b => {
+        if (b.revenue && b.revenue > 50_000_000) {
+          log(`  ✗ ${b.name} — för hög omsättning (${Math.round(b.revenue / 1_000_000)}M kr), tas bort`);
+          return false;
+        }
         if (b.employees && b.employees > 20) {
           log(`  ✗ ${b.name} — för stor aktör (${b.employees} anst.), tas bort`);
           return false;
@@ -1407,6 +1411,10 @@ async function runScraper({ industry, city, maxResults = 20, mode = 'no_website'
     const enrichedFiltered = enriched.filter(b => {
       if (b.website_found) {
         log(`  ✗ ${b.name} — webbplats bekräftad på allabolag, tas bort`);
+        return false;
+      }
+      if (b.revenue && b.revenue > 50_000_000) {
+        log(`  ✗ ${b.name} — för hög omsättning (${Math.round(b.revenue / 1_000_000)}M kr), tas bort`);
         return false;
       }
       if (b.employees && b.employees > 20) {
