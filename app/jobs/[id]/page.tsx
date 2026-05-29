@@ -83,7 +83,7 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
 
   const pushAll = async () => {
     if (!job) return;
-    const unpushed = job.prospects.filter(p => !pipelineSet.has(p.id));
+    const unpushed = job.prospects.filter(p => !pipelineSet.has(p.id) && !dismissedSet.has(p.id));
     await Promise.all(unpushed.map(p => pushToPipeline(p.id)));
   };
 
