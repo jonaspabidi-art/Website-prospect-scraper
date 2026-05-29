@@ -14,6 +14,7 @@ export async function GET(req: Request) {
   const typ = searchParams.get('typ') || '';
 
   const where = {
+    dismissed: false,
     ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
     ...(status && { status }),
     ...(pipeline === 'true' && { inPipeline: true }),

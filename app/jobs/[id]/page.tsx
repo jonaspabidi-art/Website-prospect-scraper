@@ -13,6 +13,7 @@ type Prospect = {
   source: string | null;
   priorityScore: number;
   inPipeline: boolean;
+  dismissed: boolean;
   websiteUrl: string | null;
   websiteQuality: string | null;
   websiteSignals: string | null;
@@ -35,6 +36,7 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
   const [job, setJob] = useState<Job | null>(null);
   const [pipelineSet, setPipelineSet] = useState<Set<string>>(new Set());
   const [pushing, setPushing] = useState<Set<string>>(new Set());
+  const [dismissedSet, setDismissedSet] = useState<Set<string>>(new Set());
 
   const fetchJob = async () => {
     const res = await fetch(`/api/jobs/${id}`);
@@ -42,6 +44,7 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
     setJob(data);
     if (data.prospects) {
       setPipelineSet(new Set(data.prospects.filter((p: Prospect) => p.inPipeline).map((p: Prospect) => p.id)));
+      setDismissedSet(new Set(data.prospects.filter((p: Prospect) => p.dismissed).map((p: Prospect) => p.id)));
     }
   };
 
@@ -69,6 +72,15 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
     setPushing(prev => { const s = new Set(prev); s.delete(prospectId); return s; });
   };
 
+  const dismiss = async (prospectId: string) => {
+    setDismissedSet(prev => new Set(prev).add(prospectId));
+    await fetch(`/api/prospects/${prospectId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dismissed: true }),
+    });
+  };
+
   const pushAll = async () => {
     if (!job) return;
     const unpushed = job.prospects.filter(p => !pipelineSet.has(p.id));
@@ -78,6 +90,8 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
   if (!job) return <div className="max-w-4xl mx-auto px-4 py-10 text-sm text-gray-400">Laddar...</div>;
 
   const pushedCount = pipelineSet.size;
+  const visibleProspects = job?.prospects.filter(p => !dismissedSet.has(p.id)) ?? [];
+  const dismissedCount = dismissedSet.size;
 
   return (
     <main className="max-w-4xl mx-auto px-4 py-10">
@@ -107,36 +121,24 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
         </div>
       )}
 
-      {job.prospects.length > 0 && (
+      {visibleProspects.length > 0 && (
         <div className="bg-white border rounded-xl overflow-hidden">
           <div className="flex justify-between items-center px-5 py-3 border-b bg-gray-50">
             <span className="text-sm font-medium">
-              {job.prospects.length} prospects
-              {pushedCount > 0 && (
-                <span className="ml-2 text-xs text-gray-400">({pushedCount} i pipeline)</span>
-              )}
+              {visibleProspects.length} prospects
+              {pushedCount > 0 && <span className="ml-2 text-xs text-gray-400">({pushedCount} i pipeline)</span>}
+              {dismissedCount > 0 && <span className="ml-2 text-xs text-gray-400">({dismissedCount} avvisade)</span>}
             </span>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              {pushedCount < job.prospects.length && (
+              {pushedCount < visibleProspects.length && (
                 <button
                   onClick={pushAll}
-                  style={{
-                    fontSize: 12,
-                    color: 'var(--accent)',
-                    background: 'none',
-                    border: '1px solid var(--accent)',
-                    borderRadius: 6,
-                    padding: '3px 10px',
-                    cursor: 'pointer',
-                    fontWeight: 500,
-                  }}
+                  style={{ fontSize: 12, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 500 }}
                 >
                   Lägg till alla i pipeline
                 </button>
               )}
-              <a href={`/api/jobs/${id}/csv`} className="text-xs text-blue-600 hover:underline">
-                Exportera CSV
-              </a>
+              <a href={`/api/jobs/${id}/csv`} className="text-xs text-blue-600 hover:underline">Exportera CSV</a>
             </div>
           </div>
           <table className="w-full text-sm">
@@ -148,11 +150,11 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
                 <th className="px-4 py-3 font-medium">Betyg</th>
                 <th className="px-4 py-3 font-medium">Källa</th>
                 <th className="px-4 py-3 font-medium">Score</th>
-                <th className="px-4 py-3 font-medium">Pipeline</th>
+                <th className="px-4 py-3 font-medium">Åtgärd</th>
               </tr>
             </thead>
             <tbody>
-              {job.prospects.map((p, i) => {
+              {visibleProspects.map((p, i) => {
                 const inPipe = pipelineSet.has(p.id);
                 const isLoading = pushing.has(p.id);
                 return (
@@ -162,9 +164,7 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
                       {p.address && <div className="text-xs text-gray-400">{p.address}</div>}
                       {p.websiteUrl && (
                         <div style={{ marginTop: 2 }}>
-                          <a href={p.websiteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none' }}>
-                            Hemsida
-                          </a>
+                          <a href={p.websiteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none' }}>Hemsida</a>
                           {p.websiteSignals && (
                             <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>{p.websiteSignals}</span>
                           )}
@@ -177,13 +177,7 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
                           ? <a href={`tel:${p.phone}`} style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 13 }}>{p.phone}</a>
                           : <span style={{ color: 'var(--text-muted)' }}>—</span>
                         }
-                        <a
-                          href={`https://www.google.com/maps/search/?q=${encodeURIComponent(p.name + ' ' + job.city + ' Sverige')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Visa på Google Maps"
-                          style={{ color: 'var(--text-faint)', display: 'flex', lineHeight: 1 }}
-                        >
+                        <a href={`https://www.google.com/maps/search/?q=${encodeURIComponent(p.name + ' ' + job.city + ' Sverige')}`} target="_blank" rel="noopener noreferrer" title="Visa på Google Maps" style={{ color: 'var(--text-faint)', display: 'flex', lineHeight: 1 }}>
                           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="8" cy="7" r="3"/><path d="M8 2a5 5 0 0 1 5 5c0 3.5-5 9-5 9S3 10.5 3 7a5 5 0 0 1 5-5Z"/>
                           </svg>
@@ -197,31 +191,29 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
                         p.source === 'both' ? 'bg-purple-100 text-purple-700' :
                         p.source === 'google' ? 'bg-blue-100 text-blue-700' :
                         'bg-gray-100 text-gray-600'
-                      }`}>
-                        {p.source}
-                      </span>
+                      }`}>{p.source}</span>
                     </td>
                     <td className="px-4 py-3 font-semibold">{p.priorityScore}</td>
                     <td className="px-4 py-3">
                       {inPipe ? (
                         <span style={{ fontSize: 12, color: 'var(--green, #16a34a)', fontWeight: 500 }}>✓ Tillagd</span>
                       ) : (
-                        <button
-                          onClick={() => pushToPipeline(p.id)}
-                          disabled={isLoading}
-                          style={{
-                            fontSize: 12,
-                            color: isLoading ? 'var(--text-muted)' : 'var(--accent)',
-                            background: 'none',
-                            border: `1px solid ${isLoading ? 'var(--border)' : 'var(--accent)'}`,
-                            borderRadius: 6,
-                            padding: '2px 8px',
-                            cursor: isLoading ? 'default' : 'pointer',
-                            fontWeight: 500,
-                          }}
-                        >
-                          {isLoading ? '...' : '+ Pipeline'}
-                        </button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={() => pushToPipeline(p.id)}
+                            disabled={isLoading}
+                            style={{ fontSize: 12, color: isLoading ? 'var(--text-muted)' : 'var(--accent)', background: 'none', border: `1px solid ${isLoading ? 'var(--border)' : 'var(--accent)'}`, borderRadius: 6, padding: '2px 8px', cursor: isLoading ? 'default' : 'pointer', fontWeight: 500 }}
+                          >
+                            {isLoading ? '...' : '+ Pipeline'}
+                          </button>
+                          <button
+                            onClick={() => dismiss(p.id)}
+                            title="Avvisa — dyker inte upp igen"
+                            style={{ fontSize: 12, color: 'var(--text-muted)', background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 7px', cursor: 'pointer' }}
+                          >
+                            ✕
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
