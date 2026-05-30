@@ -1300,12 +1300,14 @@ function calculateScore(biz) {
 
 // ─── Exported runner ─────────────────────────────────────────────────────────
 
-async function runScraper({ industry, city, maxResults = 20, mode = 'no_website', onProgress = () => {}, skipNames = new Set(), skipPhones = new Set() }) {
+async function runScraper({ industry, city, area = null, maxResults = 20, mode = 'no_website', onProgress = () => {}, skipNames = new Set(), skipPhones = new Set() }) {
   _logFn = (msg) => { onProgress(msg); };
 
+  const searchCity = area || city;
   const scrapeLimit = Math.min(maxResults * 3, 60);
   const modeLabel = mode === 'weak_website' ? 'svag hemsida' : 'utan hemsida';
-  log(`Prospektering: ${industry} i ${city} — läge: ${modeLabel} (samlar ${scrapeLimit} kandidater, returnerar topp ${maxResults})`);
+  const locationLabel = area ? `${area} (${city})` : city;
+  log(`Prospektering: ${industry} i ${locationLabel} — läge: ${modeLabel} (samlar ${scrapeLimit} kandidater, returnerar topp ${maxResults})`);
 
   const browser = await puppeteer.launch({
     headless: 'new',
@@ -1346,7 +1348,7 @@ async function runScraper({ industry, city, maxResults = 20, mode = 'no_website'
 
       // Step 1: Google Maps once (popular businesses first)
       const { googleProspects: googleWithWebsite } = await scrapeGoogleMaps(
-        browser, industry, city, maxResults, [], 'weak_website', skipPhones
+        browser, industry, searchCity, maxResults, [], 'weak_website', skipPhones
       );
       await randomDelay();
       const filteredGoogle = googleWithWebsite.filter(cityFilterFn);
@@ -1370,7 +1372,7 @@ async function runScraper({ industry, city, maxResults = 20, mode = 'no_website'
       for (let iter = 0; iter < MAX_ITERS && allPoor.length < TARGET; iter++) {
         log(`\nHitta-batch ${iter + 1}...`);
         const hittaBatch = await scrapeHitta(
-          browser, industry, city, BATCH, 'weak_website', runSeenNames, skipPhones
+          browser, industry, searchCity, BATCH, 'weak_website', runSeenNames, skipPhones
         );
         if (hittaBatch.length === 0) { log('Inga fler hitta-resultat, avslutar.'); break; }
 
@@ -1425,10 +1427,10 @@ async function runScraper({ industry, city, maxResults = 20, mode = 'no_website'
     }
 
     // ── no_website mode (default) ──────────────────────────────────────────────
-    const hittaResults = await scrapeHitta(browser, industry, city, scrapeLimit, 'no_website', skipNames, skipPhones);
+    const hittaResults = await scrapeHitta(browser, industry, searchCity, scrapeLimit, 'no_website', skipNames, skipPhones);
     await randomDelay();
 
-    const { googleProspects, confirmedHasWebsite } = await scrapeGoogleMaps(browser, industry, city, maxResults, hittaResults, 'no_website', skipPhones);
+    const { googleProspects, confirmedHasWebsite } = await scrapeGoogleMaps(browser, industry, searchCity, maxResults, hittaResults, 'no_website', skipPhones);
 
     if (confirmedHasWebsite.size > 0) {
       log(`Filtrerar: ${confirmedHasWebsite.size} hitta-bolag bekräftade med hemsida tas bort`);

@@ -22,6 +22,7 @@ type Job = {
   id: string;
   industry: string;
   city: string;
+  area: string | null;
   maxResults: number;
   mode: 'no_website' | 'weak_website';
   status: string;
@@ -55,6 +56,7 @@ function Pill({ status }: { status: string }) {
 export default function SokPage() {
   const [industry, setIndustry] = useState('');
   const [city, setCity] = useState('');
+  const [area, setArea] = useState('');
   const [maxResults, setMaxResults] = useState(20);
   const [mode, setMode] = useState<'no_website' | 'weak_website'>('no_website');
   const [loading, setLoading] = useState(false);
@@ -80,12 +82,13 @@ export default function SokPage() {
     const res = await fetch('/api/jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ industry, city, maxResults, mode }),
+      body: JSON.stringify({ industry, city, area: area || undefined, maxResults, mode }),
     });
     const job = await res.json();
     setActiveJobId(job.id);
     setIndustry('');
     setCity('');
+    setArea('');
     setLoading(false);
     fetchJobs();
   };
@@ -106,6 +109,7 @@ export default function SokPage() {
     e.stopPropagation();
     setIndustry(job.industry);
     setCity(job.city);
+    setArea(job.area ?? '');
     setMaxResults(job.maxResults);
     setMode(job.mode ?? 'no_website');
     setActiveJobId(null);
@@ -156,7 +160,7 @@ export default function SokPage() {
               </button>
             ))}
           </div>
-          <div className="sok-form-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 0.7fr auto', gap: 16, alignItems: 'flex-end' }}>
+          <div className="sok-form-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 0.7fr auto', gap: 16, alignItems: 'flex-end' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>Bransch</label>
               <input
@@ -178,6 +182,17 @@ export default function SokPage() {
                 onChange={e => setCity(e.target.value)}
                 placeholder="t.ex. Göteborg"
                 required
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>
+                Område <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(valfritt)</span>
+              </label>
+              <input
+                value={area}
+                onChange={e => setArea(e.target.value)}
+                placeholder="t.ex. Majorna"
                 style={inputStyle}
               />
             </div>
@@ -234,7 +249,7 @@ export default function SokPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ width: 14, height: 14, border: '2px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
-              <span style={{ fontWeight: 500 }}>Scrapar {activeJob.industry} i {activeJob.city}…</span>
+              <span style={{ fontWeight: 500 }}>Scrapar {activeJob.industry} i {activeJob.area ? `${activeJob.area}, ${activeJob.city}` : activeJob.city}…</span>
             </div>
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>uppdateras var 4:e sek</span>
           </div>
@@ -267,7 +282,7 @@ export default function SokPage() {
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600 }}>Lade till {activeJob._count.prospects} nya prospects</div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{activeJob.industry} · {activeJob.city}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{activeJob.industry} · {activeJob.area ? `${activeJob.area}, ${activeJob.city}` : activeJob.city}</div>
           </div>
           <Link href="/prospects" style={{
             background: 'var(--green)', color: '#fff', textDecoration: 'none',
@@ -328,7 +343,7 @@ export default function SokPage() {
                 >
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 600, fontSize: 15 }}>{job.industry} — {job.city}</span>
+                      <span style={{ fontWeight: 600, fontSize: 15 }}>{job.industry} — {job.area ? `${job.area}, ${job.city}` : job.city}</span>
                       <span style={{
                         fontSize: 11, fontWeight: 500, padding: '1px 7px',
                         borderRadius: 'var(--r-pill)',

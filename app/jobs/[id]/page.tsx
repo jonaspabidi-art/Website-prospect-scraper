@@ -23,6 +23,7 @@ type Job = {
   id: string;
   industry: string;
   city: string;
+  area: string | null;
   status: string;
   progress: string | null;
   error: string | null;
@@ -99,7 +100,7 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold">{job.industry} — {job.city}</h1>
+          <h1 className="text-xl font-bold">{job.industry} — {job.area ? `${job.area}, ${job.city}` : job.city}</h1>
           <p className="text-sm text-gray-400">{new Date(job.createdAt).toLocaleString('sv-SE')}</p>
         </div>
         <span className="text-sm font-medium px-3 py-1 rounded-full bg-gray-100 text-gray-700">

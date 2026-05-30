@@ -10,6 +10,7 @@ model ScrapeJob {
   id          String    @id @default(cuid())
   industry    String
   city        String
+  area        String?
   maxResults  Int       @default(20)
   mode        String    @default("no_website") // no_website | weak_website
   status      String    @default("pending") // pending | running | completed | failed

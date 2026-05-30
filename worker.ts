@@ -13,7 +13,7 @@ const connection = {
 const worker = new Worker<ScrapeJobData>(
   'scrape',
   async (job) => {
-    const { jobId, industry, city, maxResults, mode = 'no_website' } = job.data;
+    const { jobId, industry, city, area, maxResults, mode = 'no_website' } = job.data;
 
     await prisma.scrapeJob.update({
       where: { id: jobId },
@@ -40,6 +40,7 @@ const worker = new Worker<ScrapeJobData>(
     const results = await runScraper({
       industry,
       city,
+      area: area || null,
       maxResults,
       mode,
       skipNames,
