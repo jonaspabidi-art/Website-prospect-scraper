@@ -90,7 +90,7 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
   if (!job) return <div className="max-w-4xl mx-auto px-4 py-10 text-sm text-gray-400">Laddar...</div>;
 
   const pushedCount = pipelineSet.size;
-  const visibleProspects = job?.prospects.filter(p => !dismissedSet.has(p.id)) ?? [];
+  const visibleProspects = job.prospects;
   const dismissedCount = dismissedSet.size;
 
   return (
@@ -195,7 +195,9 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
                     </td>
                     <td className="px-4 py-3 font-semibold">{p.priorityScore}</td>
                     <td className="px-4 py-3">
-                      {inPipe ? (
+                      {dismissedSet.has(p.id) ? (
+                        <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 500 }}>✕ Togs bort</span>
+                      ) : inPipe ? (
                         <span style={{ fontSize: 12, color: 'var(--green, #16a34a)', fontWeight: 500 }}>✓ Tillagd</span>
                       ) : (
                         <div style={{ display: 'flex', gap: 6 }}>
