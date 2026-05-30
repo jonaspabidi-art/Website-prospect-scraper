@@ -6,7 +6,7 @@ const VALID_STATUSES = ['Ny', 'Ringd', 'Intresserad', 'Kund', 'Nej'];
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json();
-  const { status, inPipeline, dismissed } = body;
+  const { status, inPipeline, dismissed, notes } = body;
 
   if (status !== undefined && !VALID_STATUSES.includes(status)) {
     return NextResponse.json({ error: 'Ogiltig status' }, { status: 400 });
@@ -16,6 +16,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (status !== undefined) data.status = status;
   if (inPipeline !== undefined) data.inPipeline = Boolean(inPipeline);
   if (dismissed !== undefined) data.dismissed = Boolean(dismissed);
+  if (notes !== undefined) data.notes = notes;
 
   const prospect = await prisma.prospect.update({ where: { id }, data });
   return NextResponse.json(prospect);

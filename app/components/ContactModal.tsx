@@ -14,6 +14,7 @@ type Prospect = {
   priorityScore: number;
   status: string;
   websiteUrl?: string | null;
+  notes?: string | null;
   job: { industry: string; city: string };
 };
 
@@ -47,6 +48,18 @@ export default function ContactModal({ prospect, onClose, onRefresh }: Props) {
   const [copied, setCopied] = useState(false);
   const [marking, setMarking] = useState<string | null>(null);
   const [currentStatus, setCurrentStatus] = useState(prospect.status);
+  const [localNotes, setLocalNotes] = useState(prospect.notes ?? '');
+  const [notesSaved, setNotesSaved] = useState(false);
+
+  const saveNotes = async () => {
+    await fetch(`/api/prospects/${prospect.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: localNotes }),
+    });
+    setNotesSaved(true);
+    setTimeout(() => setNotesSaved(false), 1500);
+  };
 
   const industry = prospect.job?.industry ?? '';
   const city = prospect.city || prospect.job?.city || '';
@@ -276,6 +289,32 @@ Jonas`;
               <p style={{ margin: 0, fontSize: 14 }}>Vi jobbar på e-postintegration.</p>
             </div>
           )}
+
+          {/* Notes — always visible */}
+          <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Anteckningar
+              </span>
+              {notesSaved && (
+                <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 500 }}>✓ Sparad</span>
+              )}
+            </div>
+            <textarea
+              value={localNotes}
+              onChange={e => setLocalNotes(e.target.value)}
+              onBlur={saveNotes}
+              placeholder="Noteringar efter samtal…"
+              rows={3}
+              style={{
+                width: '100%', padding: '10px 14px',
+                border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+                background: 'var(--bg)', fontSize: 13, color: 'var(--text)',
+                resize: 'vertical', outline: 'none', fontFamily: 'inherit', lineHeight: 1.5,
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
         </div>
 
         {/* Footer */}

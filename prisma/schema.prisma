@@ -65,5 +65,6 @@ model Prospect {
   status             String    @default("Ny")
   inPipeline         Boolean   @default(false)
   dismissed          Boolean   @default(false)
+  notes              String?
   createdAt          DateTime  @default(now())
 }
