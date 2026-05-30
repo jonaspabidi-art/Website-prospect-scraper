@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 
 const PROSPECT_NAV = [
   {
@@ -89,6 +90,24 @@ function NavItem({ href, label, icon }: { href: string; label: string; icon: Rea
 }
 
 export default function Sidebar() {
+  const path = usePathname();
+  const router = useRouter();
+  const [user, setUser] = useState<{ email: string; role: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(d => d && setUser(d));
+  }, []);
+
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/login');
+    router.refresh();
+  };
+
+  if (path === '/login') return null;
+
+  const initials = user?.email?.slice(0, 2).toUpperCase() ?? '..';
+
   return (
     <aside className="desktop-sidebar" style={{
       width: 232,
@@ -132,26 +151,67 @@ export default function Sidebar() {
         {BUSINESS_NAV.map(item => <NavItem key={item.href} {...item} />)}
       </nav>
 
+      {user?.role === 'admin' && (
+        <>
+          <div style={{
+            fontSize: 11, fontWeight: 600, letterSpacing: '0.06em',
+            textTransform: 'uppercase', color: 'var(--text-faint)',
+            padding: '20px 10px 10px',
+            borderTop: '1px solid var(--border)',
+            marginTop: 16,
+          }}>
+            Admin
+          </div>
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <NavItem
+              href="/admin/users"
+              label="Användare"
+              icon={
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="8" cy="6" r="3"/><path d="M2 18c0-4 3-6 6-6s6 2 6 6"/>
+                  <path d="M15 8v6M12 11h6"/>
+                </svg>
+              }
+            />
+          </nav>
+        </>
+      )}
+
       <div style={{
         marginTop: 'auto',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
         padding: '14px 8px 4px',
         borderTop: '1px solid var(--border)',
       }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: '50%',
-          background: 'var(--accent-soft)',
-          color: 'var(--accent)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontWeight: 600, fontSize: 13, flexShrink: 0,
-        }}>
-          JD
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>JD Prospects</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>beta</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: '50%',
+            background: 'var(--accent-soft)', color: 'var(--accent)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 600, fontSize: 12, flexShrink: 0,
+          }}>
+            {initials}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user?.email ?? '…'}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              {user?.role === 'admin' ? 'Admin' : 'Säljare'}
+            </div>
+          </div>
+          <button
+            onClick={logout}
+            title="Logga ut"
+            style={{
+              width: 28, height: 28, border: '1px solid var(--border)', borderRadius: 6,
+              background: 'var(--bg)', color: 'var(--text-muted)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M11 11l3-3-3-3M14 8H6"/>
+            </svg>
+          </button>
         </div>
       </div>
     </aside>

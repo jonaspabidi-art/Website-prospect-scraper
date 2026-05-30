@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { scrapeQueue } from '@/lib/queue';
+import { getSession } from '@/lib/auth';
 
 function cap(s: string) {
   const t = s.trim().toLowerCase();
@@ -8,6 +9,9 @@ function cap(s: string) {
 }
 
 export async function POST(req: Request) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Ej inloggad' }, { status: 401 });
+
   const { industry, city, area, maxResults = 20, mode = 'no_website' } = await req.json();
 
   if (!industry || !city) {
@@ -20,7 +24,7 @@ export async function POST(req: Request) {
   const normMode = mode === 'weak_website' ? 'weak_website' : 'no_website';
 
   const job = await prisma.scrapeJob.create({
-    data: { industry: normIndustry, city: normCity, area: normArea, maxResults, mode: normMode },
+    data: { userId: session.userId, industry: normIndustry, city: normCity, area: normArea, maxResults, mode: normMode },
   });
 
   await scrapeQueue.add('scrape', { jobId: job.id, industry: normIndustry, city: normCity, area: normArea, maxResults, mode: normMode });
@@ -29,7 +33,13 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Ej inloggad' }, { status: 401 });
+
+  const where = session.role === 'admin' ? {} : { userId: session.userId };
+
   const jobs = await prisma.scrapeJob.findMany({
+    where,
     orderBy: { createdAt: 'desc' },
     take: 50,
     include: { _count: { select: { prospects: true } } },

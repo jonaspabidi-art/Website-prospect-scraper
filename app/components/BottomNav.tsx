@@ -57,6 +57,7 @@ const NAV = [
 
 export default function BottomNav() {
   const path = usePathname();
+  if (path === '/login') return null;
   return (
     <nav className="mobile-bottomnav">
       {NAV.map(({ href, label, icon }) => {

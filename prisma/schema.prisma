@@ -6,8 +6,19 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  passwordHash String
+  role         String      @default("seller") // admin | seller
+  createdAt    DateTime    @default(now())
+  jobs         ScrapeJob[]
+}
+
 model ScrapeJob {
   id          String    @id @default(cuid())
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id])
   industry    String
   city        String
   area        String?
