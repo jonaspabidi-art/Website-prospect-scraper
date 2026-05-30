@@ -17,6 +17,7 @@ type Prospect = {
   status: string;
   inPipeline: boolean;
   source: string | null;
+  websiteUrl: string | null;
   createdAt: string;
   job: { industry: string; city: string };
 };
@@ -190,6 +191,17 @@ export default function PipelinePage() {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)' }}>
                         <span>{p.city || p.job.city}</span>
+                        {p.websiteUrl && (
+                          <a
+                            href={p.websiteUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}
+                          >
+                            Hemsida ↗
+                          </a>
+                        )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)' }}>
                         <span>{days === 0 ? 'idag' : `${days} d sedan`}</span>
