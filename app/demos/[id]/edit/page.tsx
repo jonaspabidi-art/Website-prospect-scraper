@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, use } from 'react';
+import { useState, useEffect, useCallback, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import type { DemoContent, TemplateId, MenuItem, ServiceFeature } from '@/app/templates/types';
@@ -201,28 +201,58 @@ export default function EditDemoPage({ params }: { params: Promise<{ id: string 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const savedContentRef = useRef<string | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch(`/api/demos/${id}`)
       .then(r => r.json())
-      .then(d => { setDemo(d); setContent(d.content as DemoContent); });
+      .then(d => {
+        setDemo(d);
+        setContent(d.content as DemoContent);
+        savedContentRef.current = JSON.stringify(d.content);
+      });
   }, [id]);
 
   const set = useCallback(<K extends keyof DemoContent>(key: K, value: DemoContent[K]) => {
     setContent(c => c ? { ...c, [key]: value } : c);
   }, []);
 
-  const save = async () => {
-    if (!content) return;
+  const doSave = useCallback(async (c: DemoContent) => {
     setSaving(true);
     await fetch(`/api/demos/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content: c }),
     });
+    savedContentRef.current = JSON.stringify(c);
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  }, [id]);
+
+  // Auto-save 1.5s after last change
+  useEffect(() => {
+    if (!content) return;
+    const str = JSON.stringify(content);
+    if (str === savedContentRef.current) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => doSave(content), 1500);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [content, doSave]);
+
+  const save = () => {
+    if (!content) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    doSave(content);
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(window.location.origin + previewUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const togglePublish = async () => {
@@ -297,17 +327,25 @@ export default function EditDemoPage({ params }: { params: Promise<{ id: string 
         </div>
 
         {/* Publish + preview */}
-        <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, flexShrink: 0 }}>
+        <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6, flexShrink: 0 }}>
           <a
             href={previewUrl}
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              flex: 1, textAlign: 'center', padding: '7px 0', fontSize: 12, fontWeight: 500,
+              padding: '7px 10px', fontSize: 12, fontWeight: 500,
               border: '1px solid var(--border)', borderRadius: 7, textDecoration: 'none',
-              color: 'var(--text-muted)', background: 'var(--bg)',
+              color: 'var(--text-muted)', background: 'var(--bg)', whiteSpace: 'nowrap',
             }}
-          >↗ Öppna preview</a>
+          >↗ Preview</a>
+          <button
+            onClick={copyLink}
+            style={{
+              padding: '7px 10px', fontSize: 12, fontWeight: 500, borderRadius: 7,
+              border: '1px solid var(--border)', background: copied ? '#dcfce7' : 'var(--bg)',
+              color: copied ? '#15803d' : 'var(--text-muted)', cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >{copied ? '✓ Kopierat' : '🔗 Kopiera'}</button>
           <button
             onClick={togglePublish}
             disabled={publishing}
@@ -315,7 +353,7 @@ export default function EditDemoPage({ params }: { params: Promise<{ id: string 
               flex: 1, padding: '7px 0', fontSize: 12, fontWeight: 600, borderRadius: 7,
               border: 'none', cursor: publishing ? 'default' : 'pointer',
               background: demo.published ? '#dcfce7' : 'var(--accent)',
-              color: demo.published ? '#15803d' : '#fff',
+              color: demo.published ? '#15803d' : '#fff', whiteSpace: 'nowrap',
             }}
           >
             {demo.published ? '✓ Publicerad' : 'Publicera'}
@@ -481,10 +519,40 @@ export default function EditDemoPage({ params }: { params: Promise<{ id: string 
       </div>
 
       {/* ── Right panel: preview ── */}
-      <div style={{ flex: 1, overflowY: 'auto', background: '#f0f0f0' }}>
-        <div style={{ transform: 'scale(0.75)', transformOrigin: 'top left', width: '133.33%', pointerEvents: 'none' }}>
-          {renderTemplate(demo.template, content)}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: previewDevice === 'mobile' ? '#d1d5db' : '#f0f0f0' }}>
+        {/* Device toggle */}
+        <div style={{ padding: '8px 12px', display: 'flex', gap: 6, borderBottom: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>
+          {(['desktop', 'mobile'] as const).map(d => (
+            <button key={d} onClick={() => setPreviewDevice(d)} style={{
+              padding: '4px 12px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: previewDevice === d ? '#1a1a1a' : 'rgba(0,0,0,0.07)',
+              color: previewDevice === d ? 'white' : '#666',
+            }}>
+              {d === 'desktop' ? '🖥 Desktop' : '📱 Mobil'}
+            </button>
+          ))}
         </div>
+
+        {previewDevice === 'desktop' ? (
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div style={{ transform: 'scale(0.75)', transformOrigin: 'top left', width: '133.33%', pointerEvents: 'none' }}>
+              {renderTemplate(demo.template, content)}
+            </div>
+          </div>
+        ) : (
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', justifyContent: 'center', padding: '32px 24px' }}>
+            <div style={{
+              width: 390, flexShrink: 0,
+              border: '10px solid #1a1a1a', borderRadius: 44,
+              overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
+              background: 'white', pointerEvents: 'none',
+            }}>
+              <div style={{ transform: 'scale(0.5)', transformOrigin: 'top left', width: '200%' }}>
+                {renderTemplate(demo.template, content)}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
