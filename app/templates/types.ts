@@ -95,12 +95,12 @@ export function defaultContent(template: TemplateId): DemoContent {
     case 'verkstad':
       return {
         ...base,
-        businessName: 'Motorhuset Göteborg',
-        tagline: 'Proffs på din bil sedan 1992',
-        description: 'Vi utför alla typer av bilservice och reparationer. Certifierade mekaniker, garanterade arbeten och konkurrenskraftiga priser.',
-        openingHours: 'Mån–Fre 07:30–17:00 · Lör 09:00–13:00',
-        serviceList: ['Däckbyte & balansering', 'Oljebyte & service', 'Bromsar & hjul', 'AC-service', 'Besiktningsförberedelse', 'Felsökning'],
-        brands: ['Volvo', 'Saab', 'Ford', 'Toyota', 'BMW', 'Volkswagen'],
+        businessName: 'Däckproffsen Göteborg',
+        tagline: 'Däck & Fälg — Professionell Service sedan 1994',
+        description: 'Snabba och säkra däckbyten med den senaste utrustningen. Vi ser till att du rullar tryggt på vägarna — alltid fast pris och nöjd-kund-garanti.',
+        openingHours: 'Måndag – Torsdag  07:00 – 17:00\nFredag  07:00 – 16:00\nLördag  10:00 – 14:00\nSöndag  Stängt',
+        serviceList: ['Däckskifte & Service', 'Däckhotell', 'Hjulbalansering', 'TPMS-Service', 'Fälgar', 'Bromsar & hjul'],
+        brands: ['Continental', 'Michelin', 'Pirelli', 'Nokian', 'Bridgestone', 'Goodyear'],
       };
   }
 }
