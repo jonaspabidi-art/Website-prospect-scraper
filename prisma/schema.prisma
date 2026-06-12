@@ -45,10 +45,14 @@ model Customer {
 
 model DemoSite {
   id        String   @id @default(cuid())
-  industry  String
-  url       String
+  name      String
+  template  String   // restaurang | hantverkare | tjansteforetag | verkstad
+  content   Json     @default("{}")
+  slug      String   @unique
+  published Boolean  @default(false)
   notes     String?
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Prospect {

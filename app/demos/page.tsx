@@ -1,49 +1,45 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { TEMPLATE_LABELS, TEMPLATE_COLORS } from '@/app/templates/types';
+import type { TemplateId } from '@/app/templates/types';
 
-type DemoSite = {
+type Demo = {
   id: string;
-  industry: string;
-  url: string;
+  name: string;
+  template: TemplateId;
+  slug: string;
+  published: boolean;
   notes: string | null;
   createdAt: string;
 };
 
-const empty = { industry: '', url: '', notes: '' };
+const TEMPLATES: { id: TemplateId; emoji: string }[] = [
+  { id: 'restaurang', emoji: '🍽️' },
+  { id: 'hantverkare', emoji: '🔧' },
+  { id: 'tjansteforetag', emoji: '💼' },
+  { id: 'verkstad', emoji: '🚗' },
+];
 
-function Modal({
-  initial,
-  onSave,
-  onClose,
-}: {
-  initial: typeof empty & { id?: string };
-  onSave: (data: typeof empty & { id?: string }) => Promise<void>;
-  onClose: () => void;
-}) {
-  const [form, setForm] = useState(initial);
+function NewDemoModal({ onClose, onCreate }: { onClose: () => void; onCreate: (d: Demo) => void }) {
+  const [name, setName] = useState('');
+  const [template, setTemplate] = useState<TemplateId>('restaurang');
   const [saving, setSaving] = useState(false);
+  const router = useRouter();
 
-  const set = (k: keyof typeof empty, v: string) => setForm(f => ({ ...f, [k]: v }));
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.industry.trim() || !form.url.trim()) return;
+  const handleCreate = async () => {
+    if (!name.trim()) return;
     setSaving(true);
-    await onSave(form);
+    const res = await fetch('/api/demos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), template }),
+    });
+    const demo = await res.json();
     setSaving(false);
-  };
-
-  const fieldStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '8px 10px',
-    fontSize: 13,
-    border: '1px solid var(--border)',
-    borderRadius: 8,
-    background: 'var(--bg)',
-    color: 'var(--text)',
-    outline: 'none',
-    boxSizing: 'border-box',
+    onCreate(demo);
+    router.push(`/demos/${demo.id}/edit`);
   };
 
   return (
@@ -52,97 +48,100 @@ function Modal({
       background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
     }} onClick={onClose}>
       <div style={{
-        background: 'var(--bg)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 440,
-        boxShadow: 'var(--shadow-lg)', display: 'flex', flexDirection: 'column', gap: 16,
+        background: 'var(--bg)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 480,
+        boxShadow: 'var(--shadow-lg)',
       }} onClick={e => e.stopPropagation()}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{initial.id ? 'Redigera demo' : 'Ny demosida'}</h2>
+        <h2 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 700 }}>Ny demosida</h2>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Bransch *</label>
-            <input style={fieldStyle} value={form.industry} onChange={e => set('industry', e.target.value)} placeholder="t.ex. Rörmokare" required />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>URL *</label>
-            <input style={fieldStyle} value={form.url} onChange={e => set('url', e.target.value)} placeholder="https://demo.example.com" type="url" required />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Anteckningar</label>
-            <textarea style={{ ...fieldStyle, resize: 'vertical', minHeight: 70 }} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Byggd för VVS-bolag i Stockholm, fokus på kontaktformulär..." />
-          </div>
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Namn</label>
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="t.ex. Bergströms VVS – Stockholm"
+            autoFocus
+            style={{
+              width: '100%', boxSizing: 'border-box', padding: '9px 12px', fontSize: 14,
+              border: '1px solid var(--border)', borderRadius: 9, background: 'var(--bg)',
+              color: 'var(--text)', outline: 'none',
+            }}
+          />
+        </div>
 
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>
-            <button type="button" onClick={onClose} style={{
-              padding: '8px 16px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)',
-              background: 'none', color: 'var(--text)', cursor: 'pointer',
-            }}>
-              Avbryt
-            </button>
-            <button type="submit" disabled={saving} style={{
-              padding: '8px 18px', fontSize: 13, fontWeight: 600, borderRadius: 8,
-              border: 'none', background: 'var(--accent)', color: '#fff', cursor: saving ? 'default' : 'pointer',
-              opacity: saving ? 0.7 : 1,
-            }}>
-              {saving ? 'Sparar...' : 'Spara'}
-            </button>
+        <div style={{ marginBottom: 24 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}>Välj mall</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {TEMPLATES.map(t => {
+              const selected = template === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTemplate(t.id)}
+                  style={{
+                    padding: '14px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                    border: selected ? `2px solid ${TEMPLATE_COLORS[t.id]}` : '1.5px solid var(--border)',
+                    background: selected ? `${TEMPLATE_COLORS[t.id]}0f` : 'var(--bg-subtle)',
+                    transition: 'all 0.12s',
+                  }}
+                >
+                  <div style={{ fontSize: 22, marginBottom: 4 }}>{t.emoji}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: selected ? TEMPLATE_COLORS[t.id] : 'var(--text)' }}>
+                    {TEMPLATE_LABELS[t.id]}
+                  </div>
+                </button>
+              );
+            })}
           </div>
-        </form>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{
+            padding: '9px 18px', fontSize: 13, borderRadius: 8,
+            border: '1px solid var(--border)', background: 'none', color: 'var(--text)', cursor: 'pointer',
+          }}>Avbryt</button>
+          <button onClick={handleCreate} disabled={saving || !name.trim()} style={{
+            padding: '9px 22px', fontSize: 13, fontWeight: 600, borderRadius: 8,
+            border: 'none', background: 'var(--accent)', color: '#fff',
+            cursor: saving || !name.trim() ? 'default' : 'pointer', opacity: !name.trim() ? 0.5 : 1,
+          }}>
+            {saving ? 'Skapar...' : 'Skapa & redigera →'}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
 export default function DemosPage() {
-  const [demos, setDemos] = useState<DemoSite[]>([]);
-  const [modal, setModal] = useState<(typeof empty & { id?: string }) | null>(null);
+  const [demos, setDemos] = useState<Demo[]>([]);
+  const [showNew, setShowNew] = useState(false);
+  const router = useRouter();
 
-  const fetch_ = async () => {
-    const res = await fetch('/api/demos');
-    setDemos(await res.json());
-  };
-
-  useEffect(() => { fetch_(); }, []);
-
-  const openNew = () => setModal({ ...empty });
-  const openEdit = (d: DemoSite) => setModal({ id: d.id, industry: d.industry, url: d.url, notes: d.notes ?? '' });
-
-  const save = async (form: typeof empty & { id?: string }) => {
-    const method = form.id ? 'PATCH' : 'POST';
-    const url = form.id ? `/api/demos/${form.id}` : '/api/demos';
-    await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
-    setModal(null);
-    fetch_();
-  };
+  useEffect(() => {
+    fetch('/api/demos').then(r => r.json()).then(setDemos);
+  }, []);
 
   const del = async (id: string) => {
     if (!window.confirm('Ta bort demosidan?')) return;
     await fetch(`/api/demos/${id}`, { method: 'DELETE' });
-    fetch_();
+    setDemos(ds => ds.filter(d => d.id !== id));
   };
 
-  // Group by industry
-  const grouped = demos.reduce<Record<string, DemoSite[]>>((acc, d) => {
-    (acc[d.industry] = acc[d.industry] || []).push(d);
-    return acc;
-  }, {});
+  const templateEmoji = (t: TemplateId) => TEMPLATES.find(x => x.id === t)?.emoji ?? '🖥️';
 
   return (
-    <div style={{ padding: '48px 32px 80px', maxWidth: 800, margin: '0 auto' }}>
+    <div style={{ padding: '48px 32px 80px', maxWidth: 900, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 36 }}>
         <div>
-          <h1 style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.025em', margin: 0, lineHeight: 1.15 }}>Demosidor</h1>
+          <h1 style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.025em', margin: 0, lineHeight: 1.15 }}>Demosidor</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: 15, margin: '6px 0 0' }}>
-            {demos.length} demo{demos.length !== 1 ? 's' : ''} · {Object.keys(grouped).length} bransch{Object.keys(grouped).length !== 1 ? 'er' : ''}
+            {demos.length} demo{demos.length !== 1 ? 's' : ''} · {demos.filter(d => d.published).length} publicerade
           </p>
         </div>
-        <button onClick={openNew} style={{
+        <button onClick={() => setShowNew(true)} style={{
           padding: '9px 18px', fontSize: 13, fontWeight: 600, borderRadius: 10,
-          border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer',
-          flexShrink: 0,
+          border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', flexShrink: 0,
         }}>
           + Ny demo
         </button>
@@ -153,76 +152,73 @@ export default function DemosPage() {
           textAlign: 'center', padding: '80px 20px',
           color: 'var(--text-muted)', border: '1px dashed var(--border)', borderRadius: 16,
         }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>🖥️</div>
-          <div style={{ fontWeight: 500 }}>Inga demosidor ännu</div>
-          <div style={{ fontSize: 13, marginTop: 4 }}>Lägg till en demo för varje bransch du pitchar mot</div>
+          <div style={{ fontSize: 36, marginBottom: 14 }}>🖥️</div>
+          <div style={{ fontWeight: 600, fontSize: 16 }}>Inga demosidor ännu</div>
+          <div style={{ fontSize: 14, marginTop: 6, marginBottom: 20 }}>Bygg en hemsida-demo och dela länken med din prospect</div>
+          <button onClick={() => setShowNew(true)} style={{
+            padding: '10px 22px', fontSize: 14, fontWeight: 600, borderRadius: 9,
+            border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer',
+          }}>Skapa din första demo</button>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {Object.entries(grouped).map(([industry, items]) => (
-            <div key={industry}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {demos.map(d => (
+            <div key={d.id} style={{
+              background: 'var(--bg)', border: '1px solid var(--border)',
+              borderRadius: 14, padding: '16px 20px',
+              display: 'flex', alignItems: 'center', gap: 16,
+              boxShadow: 'var(--shadow-sm)',
+            }}>
               <div style={{
-                fontSize: 11, fontWeight: 700, letterSpacing: '0.07em',
-                textTransform: 'uppercase', color: 'var(--text-faint)',
-                marginBottom: 10,
+                width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                background: `${TEMPLATE_COLORS[d.template]}18`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
               }}>
-                {industry}
+                {templateEmoji(d.template)}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {items.map(d => (
-                  <div key={d.id} style={{
-                    background: 'var(--bg)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--r-md)',
-                    padding: '14px 18px',
-                    display: 'flex', alignItems: 'center', gap: 16,
-                    boxShadow: 'var(--shadow-sm)',
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>{d.name}</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{TEMPLATE_LABELS[d.template]}</span>
+                  <span style={{
+                    fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 50,
+                    background: d.published ? '#dcfce7' : 'var(--bg-subtle)',
+                    color: d.published ? '#15803d' : 'var(--text-faint)',
+                    border: `1px solid ${d.published ? '#86efac' : 'var(--border)'}`,
                   }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <a
-                        href={d.url} target="_blank" rel="noopener noreferrer"
-                        style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', wordBreak: 'break-all' }}
-                      >
-                        {d.url.replace(/^https?:\/\//, '')}
-                      </a>
-                      {d.notes && (
-                        <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>{d.notes}</p>
-                      )}
-                    </div>
-                    <a
-                      href={d.url} target="_blank" rel="noopener noreferrer"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        fontSize: 12, fontWeight: 500, color: 'var(--accent)',
-                        background: 'var(--accent-soft)', border: '1px solid rgba(26,86,219,0.18)',
-                        borderRadius: 7, padding: '5px 11px', textDecoration: 'none',
-                        flexShrink: 0,
-                      }}
-                    >
-                      Öppna
-                      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M1 11 10 2M4 2h6v6"/>
-                      </svg>
-                    </a>
-                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                      <button onClick={() => openEdit(d)} style={{
-                        background: 'none', border: '1px solid var(--border)', borderRadius: 7,
-                        padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: 'var(--text-muted)',
-                      }}>Redigera</button>
-                      <button onClick={() => del(d.id)} style={{
-                        background: 'none', border: '1px solid var(--red-border)', borderRadius: 7,
-                        padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: 'var(--red)',
-                      }}>Ta bort</button>
-                    </div>
-                  </div>
-                ))}
+                    {d.published ? 'Publicerad' : 'Utkast'}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+                <a
+                  href={`/demos/preview/${d.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: '6px 12px', fontSize: 12, fontWeight: 500,
+                    border: '1px solid var(--border)', borderRadius: 7,
+                    textDecoration: 'none', color: 'var(--text-muted)', background: 'var(--bg-subtle)',
+                  }}
+                >↗ Preview</a>
+                <button onClick={() => router.push(`/demos/${d.id}/edit`)} style={{
+                  padding: '6px 14px', fontSize: 12, fontWeight: 600,
+                  border: 'none', borderRadius: 7, background: 'var(--accent)',
+                  color: '#fff', cursor: 'pointer',
+                }}>Redigera</button>
+                <button onClick={() => del(d.id)} style={{
+                  background: 'none', border: '1px solid var(--red-border)', borderRadius: 7,
+                  padding: '6px 10px', fontSize: 12, cursor: 'pointer', color: 'var(--red)',
+                }}>Ta bort</button>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {modal && <Modal initial={modal} onSave={save} onClose={() => setModal(null)} />}
+      {showNew && <NewDemoModal onClose={() => setShowNew(false)} onCreate={d => setDemos(ds => [d, ...ds])} />}
     </div>
   );
 }

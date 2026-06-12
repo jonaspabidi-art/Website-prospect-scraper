@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const PUBLIC = ['/login', '/api/auth/', '/api/setup'];
+const PUBLIC = ['/login', '/api/auth/', '/api/setup', '/demos/preview/', '/api/demos/preview/'];
 const getSecret = () =>
   new TextEncoder().encode(process.env.JWT_SECRET ?? 'dev-secret-change-in-prod');
 
