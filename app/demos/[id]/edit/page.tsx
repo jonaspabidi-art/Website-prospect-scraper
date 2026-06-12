@@ -120,18 +120,29 @@ function ImageUpload({ label, value, field, demoId, onChange }: {
   label: string; value: string | null; field: string; demoId: string; onChange: (url: string | null) => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setError(null);
     try {
       const fd = new FormData();
       fd.append('file', file);
       const res = await fetch(`/api/demos/${demoId}/upload`, { method: 'POST', body: fd });
       const data = await res.json();
-      if (data.url) onChange(data.url);
-    } finally { setUploading(false); }
+      if (data.url) {
+        onChange(data.url);
+      } else {
+        setError(data.error || `Fel ${res.status}`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nätverksfel');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
   };
 
   return (
@@ -154,6 +165,7 @@ function ImageUpload({ label, value, field, demoId, onChange }: {
           }}>Ta bort</button>
         )}
       </div>
+      {error && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>⚠ {error}</div>}
     </FieldRow>
   );
 }

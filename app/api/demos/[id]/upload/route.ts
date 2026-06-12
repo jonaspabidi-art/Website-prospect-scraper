@@ -19,8 +19,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   if (file.size > 5 * 1024 * 1024) return NextResponse.json({ error: 'Max 5 MB' }, { status: 400 });
 
-  const buf = Buffer.from(await file.arrayBuffer());
-  const url = await uploadImage(buf, file.name, file.type);
-
-  return NextResponse.json({ url });
+  try {
+    const buf = Buffer.from(await file.arrayBuffer());
+    const url = await uploadImage(buf, file.name, file.type);
+    return NextResponse.json({ url });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Okänt fel';
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
