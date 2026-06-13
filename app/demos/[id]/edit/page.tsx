@@ -211,6 +211,27 @@ function GalleryUploadButton({ demoId, onAdd }: { demoId: string; onAdd: (url: s
   );
 }
 
+// ── Section background upload ─────────────────────────────────
+function SectionBgUpload({ sectionId, content, set, demoId }: {
+  sectionId: string;
+  content: DemoContent;
+  set: <K extends keyof DemoContent>(k: K, v: DemoContent[K]) => void;
+  demoId: string;
+}) {
+  const current = content.sectionBackgrounds?.[sectionId] ?? null;
+  const update = (url: string | null) => {
+    const next = { ...(content.sectionBackgrounds ?? {}) };
+    if (url) next[sectionId] = url;
+    else delete next[sectionId];
+    set('sectionBackgrounds', next);
+  };
+  return (
+    <div style={{ paddingTop: 4, borderTop: '1px solid var(--border)', marginTop: 4 }}>
+      <ImageUpload label="Bakgrundsbild (sektion)" value={current} demoId={demoId} onChange={update} />
+    </div>
+  );
+}
+
 // ── Section controls ──────────────────────────────────────────
 function SectionControls({
   section, template, content, set, demoId,
@@ -248,14 +269,19 @@ function SectionControls({
         <>
           <ImageUpload label="Logo" value={content.logoUrl} demoId={demoId} onChange={v => set('logoUrl', v)} />
           {content.logoUrl && (
-            <FieldRow label={`Logostorlek — ${content.logoHeight ?? 40}px`}>
-              <input
-                type="range" min={20} max={120} step={2}
-                value={content.logoHeight ?? 40}
-                onChange={e => set('logoHeight', Number(e.target.value))}
-                style={{ width: '100%', cursor: 'pointer' }}
-              />
-            </FieldRow>
+            <>
+              <FieldRow label={`Logostorlek — ${content.logoHeight ?? 40}px`}>
+                <input type="range" min={20} max={120} step={2} value={content.logoHeight ?? 40} onChange={e => set('logoHeight', Number(e.target.value))} style={{ width: '100%', cursor: 'pointer' }} />
+              </FieldRow>
+              {template === 'verkstad' && (
+                <FieldRow label="Visa företagsnamn bredvid loggan">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text)' }}>
+                    <input type="checkbox" checked={content.showBusinessName !== false} onChange={e => set('showBusinessName', e.target.checked)} />
+                    {content.showBusinessName !== false ? 'Visas' : 'Dolt'}
+                  </label>
+                </FieldRow>
+              )}
+            </>
           )}
           <FieldRow label="Företagsnamn">
             <div style={{ display: 'flex', gap: 6 }}>
@@ -263,13 +289,14 @@ function SectionControls({
               <AIButton field="businessName" value={content.businessName} template={template} businessName={content.businessName} onResult={v => set('businessName', v)} />
             </div>
           </FieldRow>
+          <SectionBgUpload sectionId="header" content={content} set={set} demoId={demoId} />
         </>
       );
 
     case 'hero':
       return (
         <>
-          <ImageUpload label="Bakgrundsbild" value={content.heroImageUrl} demoId={demoId} onChange={v => set('heroImageUrl', v)} />
+          <ImageUpload label="Huvudbild (hero)" value={content.heroImageUrl} demoId={demoId} onChange={v => set('heroImageUrl', v)} />
           {template === 'restaurang' && (
             <>
               <ImageUpload label="Logo" value={content.logoUrl} demoId={demoId} onChange={v => set('logoUrl', v)} />
@@ -305,17 +332,21 @@ function SectionControls({
               </div>
             </FieldRow>
           )}
+          <SectionBgUpload sectionId="hero" content={content} set={set} demoId={demoId} />
         </>
       );
 
     case 'about':
       return (
-        <FieldRow label="Beskrivning">
-          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-            <textarea style={{ ...inp, resize: 'vertical', minHeight: 100 }} value={content.description} onChange={e => set('description', e.target.value)} />
-            <AIButton field="description" value={content.description} template={template} businessName={content.businessName} onResult={v => set('description', v)} />
-          </div>
-        </FieldRow>
+        <>
+          <FieldRow label="Beskrivning">
+            <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+              <textarea style={{ ...inp, resize: 'vertical', minHeight: 100 }} value={content.description} onChange={e => set('description', e.target.value)} />
+              <AIButton field="description" value={content.description} template={template} businessName={content.businessName} onResult={v => set('description', v)} />
+            </div>
+          </FieldRow>
+          <SectionBgUpload sectionId="about" content={content} set={set} demoId={demoId} />
+        </>
       );
 
     case 'services':
@@ -335,6 +366,7 @@ function SectionControls({
             <button type="button" onClick={() => set('serviceFeatures', [...(content.serviceFeatures || []), { title: '', description: '' }])} style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
               + Lägg till tjänst
             </button>
+            <SectionBgUpload sectionId="services" content={content} set={set} demoId={demoId} />
           </>
         );
       }
@@ -357,6 +389,7 @@ function SectionControls({
             <button type="button" onClick={() => set('serviceList', [...(content.serviceList || []), ''])} style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
               + Lägg till tjänst
             </button>
+            <SectionBgUpload sectionId="services" content={content} set={set} demoId={demoId} />
           </>
         );
       }
@@ -372,6 +405,7 @@ function SectionControls({
           <button type="button" onClick={() => set('serviceList', [...(content.serviceList || []), ''])} style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
             + Lägg till tjänst
           </button>
+          <SectionBgUpload sectionId="services" content={content} set={set} demoId={demoId} />
         </>
       );
 
@@ -392,6 +426,7 @@ function SectionControls({
           <button type="button" onClick={() => set('menuItems', [...(content.menuItems || []), { name: '', description: '', price: '' }])} style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
             + Lägg till rätt
           </button>
+          <SectionBgUpload sectionId="menu" content={content} set={set} demoId={demoId} />
         </>
       );
 
@@ -428,6 +463,7 @@ function SectionControls({
           <button type="button" onClick={() => set('brands', [...(content.brands || []), ''])} style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
             + Lägg till märke
           </button>
+          <SectionBgUpload sectionId="brands" content={content} set={set} demoId={demoId} />
         </>
       );
 
@@ -451,14 +487,18 @@ function SectionControls({
               </div>
             </FieldRow>
           )}
+          <SectionBgUpload sectionId="contact" content={content} set={set} demoId={demoId} />
         </>
       );
 
     case 'offers':
       return (
-        <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          Erbjudandena visas automatiskt baserat på dina tjänster och priser.
-        </p>
+        <>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            Erbjudandena visas automatiskt baserat på dina tjänster och priser.
+          </p>
+          <SectionBgUpload sectionId="offers" content={content} set={set} demoId={demoId} />
+        </>
       );
 
     case 'cta':
@@ -470,6 +510,7 @@ function SectionControls({
           <FieldRow label="E-post">
             <input style={inp} value={content.email} onChange={e => set('email', e.target.value)} />
           </FieldRow>
+          <SectionBgUpload sectionId="cta" content={content} set={set} demoId={demoId} />
         </>
       );
 
@@ -742,7 +783,7 @@ export default function EditDemoPage({ params }: { params: Promise<{ id: string 
         ) : (
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', justifyContent: 'center', padding: '32px 24px' }}>
             <div style={{ width: 390, flexShrink: 0, border: '10px solid #1a1a1a', borderRadius: 44, overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.4)', background: 'white' }}>
-              <div style={{ zoom: 0.305 } as React.CSSProperties}>
+              <div style={{ width: 1280, zoom: 0.305 } as React.CSSProperties}>
                 {renderTemplate(demo.template, content, editProps)}
               </div>
             </div>
