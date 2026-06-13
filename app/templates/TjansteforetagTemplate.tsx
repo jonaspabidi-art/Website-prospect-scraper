@@ -17,7 +17,7 @@ export default function TjansteforetagTemplate({ content, editMode, selectedSect
   return (
     <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", color: '#111827', minHeight: '100vh' }}>
       {/* Nav */}
-      <EditableSection id="header" editMode={editMode} selected={sel('header')} onSelect={onSectionClick} outerStyle={{ position: 'sticky', top: 0, zIndex: 10 }}>
+      <EditableSection id="header" editMode={editMode} selected={sel('header')} onSelect={onSectionClick} bgImage={content.sectionBackgrounds?.["header"]} outerStyle={{ position: 'sticky', top: 0, zIndex: 10 }}>
       <nav style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 68, position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {content.logoUrl
@@ -36,7 +36,7 @@ export default function TjansteforetagTemplate({ content, editMode, selectedSect
       </EditableSection>
 
       {/* Hero */}
-      <EditableSection id="hero" editMode={editMode} selected={sel('hero')} onSelect={onSectionClick}>
+      <EditableSection id="hero" editMode={editMode} selected={sel('hero')} onSelect={onSectionClick} bgImage={content.sectionBackgrounds?.["hero"]}>
       <section style={{
         background: `linear-gradient(135deg, #f5f3ff 0%, #ede9fe 40%, #fff 100%)`,
         padding: '100px 40px 80px',
@@ -82,7 +82,7 @@ export default function TjansteforetagTemplate({ content, editMode, selectedSect
 
       {/* Services */}
       {content.serviceFeatures && content.serviceFeatures.length > 0 && (
-        <EditableSection id="services" editMode={editMode} selected={sel('services')} onSelect={onSectionClick}>
+        <EditableSection id="services" editMode={editMode} selected={sel('services')} onSelect={onSectionClick} bgImage={content.sectionBackgrounds?.["services"]}>
         <section style={{ background: '#fff', padding: '80px 40px' }}>
           <div style={{ maxWidth: 960, margin: '0 auto' }}>
             <h2 style={{ textAlign: 'center', fontSize: 32, fontWeight: 700, marginBottom: 12, letterSpacing: '-0.02em' }}>Vad vi erbjuder</h2>
@@ -113,7 +113,7 @@ export default function TjansteforetagTemplate({ content, editMode, selectedSect
 
       {/* Galleri (optional) */}
       {content.galleryImages && content.galleryImages.filter(Boolean).length > 0 && (
-        <EditableSection id="gallery" editMode={editMode} selected={sel('gallery')} onSelect={onSectionClick}>
+        <EditableSection id="gallery" editMode={editMode} selected={sel('gallery')} onSelect={onSectionClick} bgImage={content.sectionBackgrounds?.["gallery"]}>
         <section style={{ padding: '56px 40px' }}>
           <div style={{ maxWidth: 960, margin: '0 auto' }}>
             <h2 style={{ textAlign: 'center', fontSize: 32, fontWeight: 700, marginBottom: 32, letterSpacing: '-0.02em' }}>Galleri</h2>
@@ -128,7 +128,7 @@ export default function TjansteforetagTemplate({ content, editMode, selectedSect
       )}
 
       {/* CTA */}
-      <EditableSection id="cta" editMode={editMode} selected={sel('cta')} onSelect={onSectionClick}>
+      <EditableSection id="cta" editMode={editMode} selected={sel('cta')} onSelect={onSectionClick} bgImage={content.sectionBackgrounds?.["cta"]}>
       <section style={{ background: `linear-gradient(135deg, ${c} 0%, #4f46e5 100%)`, padding: '64px 40px', textAlign: 'center' }}>
         <h2 style={{ fontSize: 32, fontWeight: 700, color: '#fff', margin: '0 0 16px', letterSpacing: '-0.02em' }}>
           Redo att ta nästa steg?

@@ -20,7 +20,7 @@ export default function RestaurangTemplate({ content, editMode, selectedSection,
   return (
     <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", color: '#1a1209', minHeight: '100vh', background: '#fdf8f0' }}>
       {/* Hero */}
-      <EditableSection id="hero" editMode={editMode} selected={sel('hero')} onSelect={onSectionClick}>
+      <EditableSection id="hero" editMode={editMode} selected={sel('hero')} onSelect={onSectionClick} bgImage={content.sectionBackgrounds?.["hero"]}>
       <section style={{ background: bg, minHeight: 480, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', textAlign: 'center' }}>
         {content.logoUrl && (
           <img src={content.logoUrl} alt="Logo" style={{ height: content.logoHeight ?? 64, maxWidth: (content.logoHeight ?? 64) * 4, marginBottom: 24, objectFit: 'contain' }} />
@@ -50,7 +50,7 @@ export default function RestaurangTemplate({ content, editMode, selectedSection,
       </EditableSection>
 
       {/* About */}
-      <EditableSection id="about" editMode={editMode} selected={sel('about')} onSelect={onSectionClick}>
+      <EditableSection id="about" editMode={editMode} selected={sel('about')} onSelect={onSectionClick} bgImage={content.sectionBackgrounds?.["about"]}>
       <section style={{ maxWidth: 720, margin: '0 auto', padding: '64px 24px 48px', textAlign: 'center' }}>
         <p style={{ fontSize: 18, lineHeight: 1.75, color: '#4a3520' }}>{content.description}</p>
       </section>
@@ -58,7 +58,7 @@ export default function RestaurangTemplate({ content, editMode, selectedSection,
 
       {/* Menu */}
       {content.menuItems && content.menuItems.length > 0 && (
-        <EditableSection id="menu" editMode={editMode} selected={sel('menu')} onSelect={onSectionClick}>
+        <EditableSection id="menu" editMode={editMode} selected={sel('menu')} onSelect={onSectionClick} bgImage={content.sectionBackgrounds?.["menu"]}>
         <section id="meny" style={{ background: '#fff', padding: '56px 24px' }}>
           <div style={{ maxWidth: 840, margin: '0 auto' }}>
             <h2 style={{ textAlign: 'center', fontSize: 32, fontWeight: 700, marginBottom: 40, letterSpacing: '-0.02em' }}>Vår meny</h2>
@@ -82,7 +82,7 @@ export default function RestaurangTemplate({ content, editMode, selectedSection,
 
       {/* Galleri (optional) */}
       {content.galleryImages && content.galleryImages.filter(Boolean).length > 0 && (
-        <EditableSection id="gallery" editMode={editMode} selected={sel('gallery')} onSelect={onSectionClick}>
+        <EditableSection id="gallery" editMode={editMode} selected={sel('gallery')} onSelect={onSectionClick} bgImage={content.sectionBackgrounds?.["gallery"]}>
         <section style={{ padding: '56px 24px', background: '#fdf8f0' }}>
           <div style={{ maxWidth: 840, margin: '0 auto' }}>
             <h2 style={{ textAlign: 'center', fontSize: 32, fontWeight: 700, marginBottom: 32, letterSpacing: '-0.02em' }}>Galleri</h2>
@@ -97,7 +97,7 @@ export default function RestaurangTemplate({ content, editMode, selectedSection,
       )}
 
       {/* Info */}
-      <EditableSection id="contact" editMode={editMode} selected={sel('contact')} onSelect={onSectionClick}>
+      <EditableSection id="contact" editMode={editMode} selected={sel('contact')} onSelect={onSectionClick} bgImage={content.sectionBackgrounds?.["contact"]}>
       <section style={{ maxWidth: 840, margin: '0 auto', padding: '56px 24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 24 }}>
           {content.openingHours && (

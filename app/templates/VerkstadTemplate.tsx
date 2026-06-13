@@ -207,7 +207,7 @@ export default function VerkstadTemplate({ content, editMode, selectedSection, o
       <BookingModal open={bookingOpen} onClose={() => setBookingOpen(false)} primary={primary} />
 
       {/* ── Header ── */}
-      <EditableSection id="header" editMode={editMode} selected={sel('header')} onSelect={onSectionClick} outerStyle={{ position: 'sticky', top: 0, zIndex: 50 }}>
+      <EditableSection id="header" editMode={editMode} selected={sel('header')} onSelect={onSectionClick} outerStyle={{ position: 'sticky', top: 0, zIndex: 50 }} bgImage={content.sectionBackgrounds?.['header']}>
       <header style={{ background: '#f9f9f9', borderBottom: '2px solid #1a1c1c', position: 'sticky', top: 0, zIndex: 50 }}>
         <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 48px', maxWidth: 1280, margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -218,9 +218,11 @@ export default function VerkstadTemplate({ content, editMode, selectedSection, o
                 {content.businessName[0]}
               </div>
             )}
-            <span style={{ fontFamily: HEADLINE, fontWeight: 700, fontSize: 22, color: primary, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-              {content.businessName}
-            </span>
+            {content.showBusinessName !== false && (
+              <span style={{ fontFamily: HEADLINE, fontWeight: 700, fontSize: 22, color: primary, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                {content.businessName}
+              </span>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 32 }}>
             {['Hem', 'Tjänster', 'Kontakt'].map(l => (
@@ -240,7 +242,7 @@ export default function VerkstadTemplate({ content, editMode, selectedSection, o
       </EditableSection>
 
       {/* ── Hero ── */}
-      <EditableSection id="hero" editMode={editMode} selected={sel('hero')} onSelect={onSectionClick}>
+      <EditableSection id="hero" editMode={editMode} selected={sel('hero')} onSelect={onSectionClick} bgImage={content.sectionBackgrounds?.['hero']}>
       <section style={{ position: 'relative', height: 'min(90vh, 900px)', minHeight: 520, display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
         <img src={hero} alt={content.businessName} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 55%' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.05) 100%)' }} />
@@ -264,7 +266,7 @@ export default function VerkstadTemplate({ content, editMode, selectedSection, o
       </EditableSection>
 
       {/* ── Tjänster ── */}
-      <EditableSection id="services" editMode={editMode} selected={sel('services')} onSelect={onSectionClick}>
+      <EditableSection id="services" editMode={editMode} selected={sel('services')} onSelect={onSectionClick} bgImage={content.sectionBackgrounds?.['services']}>
       <section style={{ padding: '80px 48px', maxWidth: 1280, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 56 }}>
           <h2 style={{ fontFamily: HEADLINE, fontSize: 48, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '-0.02em', margin: 0 }}>
@@ -304,7 +306,7 @@ export default function VerkstadTemplate({ content, editMode, selectedSection, o
       </EditableSection>
 
       {/* ── Erbjudanden ── */}
-      <EditableSection id="offers" editMode={editMode} selected={sel('offers')} onSelect={onSectionClick}>
+      <EditableSection id="offers" editMode={editMode} selected={sel('offers')} onSelect={onSectionClick} bgImage={content.sectionBackgrounds?.['offers']}>
       <section style={{ background: '#f4f3f3', padding: '80px 48px' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto' }}>
           <div style={{ marginBottom: 40 }}>
@@ -345,7 +347,7 @@ export default function VerkstadTemplate({ content, editMode, selectedSection, o
       </EditableSection>
 
       {/* ── Info / Kontakt ── */}
-      <EditableSection id="contact" editMode={editMode} selected={sel('contact')} onSelect={onSectionClick}>
+      <EditableSection id="contact" editMode={editMode} selected={sel('contact')} onSelect={onSectionClick} bgImage={content.sectionBackgrounds?.['contact']}>
       <section style={{ padding: '80px 48px', maxWidth: 1280, margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80 }}>
           <div>

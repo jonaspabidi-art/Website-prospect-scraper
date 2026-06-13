@@ -20,7 +20,9 @@ export interface DemoContent {
   address: string;
   logoUrl: string | null;
   logoHeight?: number;
+  showBusinessName?: boolean;
   heroImageUrl: string | null;
+  sectionBackgrounds?: Record<string, string>;
   primaryColor: string;
   // restaurang
   openingHours?: string;
