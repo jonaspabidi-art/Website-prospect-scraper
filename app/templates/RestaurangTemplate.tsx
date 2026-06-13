@@ -101,11 +101,11 @@ export default function RestaurangTemplate({ content, editMode, selectedSection,
       <section style={{ maxWidth: 840, margin: '0 auto', padding: '56px 24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 24 }}>
           {content.openingHours && (
-            <InfoCard icon="🕐" title="Öppettider" text={content.openingHours} accent={c} />
+            <InfoCard icon="○" title="Öppettider" text={content.openingHours} accent={c} />
           )}
-          <InfoCard icon="📍" title="Adress" text={content.address} accent={c} />
-          <InfoCard icon="📞" title="Telefon" text={content.phone} accent={c} />
-          <InfoCard icon="✉️" title="E-post" text={content.email} accent={c} />
+          <InfoCard icon="◆" title="Adress" text={content.address} accent={c} />
+          <InfoCard icon="◎" title="Telefon" text={content.phone} accent={c} />
+          <InfoCard icon="→" title="E-post" text={content.email} accent={c} />
         </div>
       </section>
       </EditableSection>

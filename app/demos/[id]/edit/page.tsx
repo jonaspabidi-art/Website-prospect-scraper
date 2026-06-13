@@ -30,30 +30,30 @@ type SectionDef = { id: string; label: string; icon: string };
 
 const TEMPLATE_SECTIONS: Record<TemplateId, SectionDef[]> = {
   verkstad: [
-    { id: 'header', label: 'Header & Logo', icon: '⬛' },
-    { id: 'hero', label: 'Hero', icon: '🖼' },
-    { id: 'services', label: 'Tjänster', icon: '⚙️' },
-    { id: 'offers', label: 'Erbjudanden', icon: '💰' },
-    { id: 'contact', label: 'Kontakt & öppettider', icon: '📍' },
-    { id: 'brands', label: 'Märken', icon: '🏷' },
+    { id: 'header', label: 'Header & Logo', icon: '▪' },
+    { id: 'hero', label: 'Hero', icon: '◆' },
+    { id: 'services', label: 'Tjänster', icon: '≡' },
+    { id: 'offers', label: 'Erbjudanden', icon: '◇' },
+    { id: 'contact', label: 'Kontakt & öppettider', icon: '○' },
+    { id: 'brands', label: 'Märken', icon: '◈' },
   ],
   restaurang: [
-    { id: 'hero', label: 'Hero & Logo', icon: '🖼' },
-    { id: 'about', label: 'Om oss', icon: '📝' },
-    { id: 'menu', label: 'Meny', icon: '🍽' },
-    { id: 'contact', label: 'Kontakt & öppettider', icon: '📍' },
+    { id: 'hero', label: 'Hero & Logo', icon: '◆' },
+    { id: 'about', label: 'Om oss', icon: '◦' },
+    { id: 'menu', label: 'Meny', icon: '≡' },
+    { id: 'contact', label: 'Kontakt & öppettider', icon: '○' },
   ],
   hantverkare: [
-    { id: 'header', label: 'Header & Logo', icon: '⬛' },
-    { id: 'hero', label: 'Hero', icon: '🖼' },
-    { id: 'services', label: 'Tjänster', icon: '⚙️' },
-    { id: 'contact', label: 'Kontakt', icon: '📍' },
+    { id: 'header', label: 'Header & Logo', icon: '▪' },
+    { id: 'hero', label: 'Hero', icon: '◆' },
+    { id: 'services', label: 'Tjänster', icon: '≡' },
+    { id: 'contact', label: 'Kontakt', icon: '○' },
   ],
   tjansteforetag: [
-    { id: 'header', label: 'Header & Logo', icon: '⬛' },
-    { id: 'hero', label: 'Hero', icon: '🖼' },
-    { id: 'services', label: 'Tjänster', icon: '⚙️' },
-    { id: 'cta', label: 'Kontakt-sektion', icon: '✨' },
+    { id: 'header', label: 'Header & Logo', icon: '▪' },
+    { id: 'hero', label: 'Hero', icon: '◆' },
+    { id: 'services', label: 'Tjänster', icon: '≡' },
+    { id: 'cta', label: 'Kontakt-sektion', icon: '→' },
   ],
 };
 
@@ -693,7 +693,7 @@ export default function EditDemoPage({ params }: { params: Promise<{ id: string 
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                 >
-                  <span style={{ fontSize: 16 }}>📷</span>
+                  <span style={{ fontSize: 16 }}>▦</span>
                   <span style={{ flex: 1 }}>Galleri</span>
                   <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>›</span>
                 </button>

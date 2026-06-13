@@ -99,7 +99,7 @@ export default function TjansteforetagTemplate({ content, editMode, selectedSect
                     background: `${c}18`, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     marginBottom: 16,
                   }}>
-                    <span style={{ fontSize: 20 }}>{['💡', '🚀', '🎯', '📊', '⚡', '🛡️'][i % 6]}</span>
+                    <span style={{ fontSize: 20 }}>{['◆', '▲', '●', '▪', '◈', '○'][i % 6]}</span>
                   </div>
                   <h3 style={{ fontWeight: 700, fontSize: 17, margin: '0 0 8px' }}>{f.title}</h3>
                   <p style={{ color: '#6b7280', fontSize: 14, lineHeight: 1.65, margin: 0 }}>{f.description}</p>

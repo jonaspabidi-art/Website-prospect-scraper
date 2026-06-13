@@ -10,7 +10,7 @@ const BODY = "'Open Sans', sans-serif";
 const DEFAULT_HERO =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuCGne4OEqcZ51BLeTzWu-WkA8ivbIYW58qERgwYhxHpyr3P6rJFDPt_2mFFUBawACaQeEFns_0FJcFAjkwtQBeU1eBP3apzik3mpiwTZuknX_mp99CX5c80_ZXiqES08E6z1UNVjMZOsfzMxHgqJTus-zADEzg_3UN774p02lS2CUk6zqhgXdN8XI_6J77EP9m1ZSOQSuJe7VLOuWDFwnXn9k2hkD0qJlvQPY_h48Ds4jsjWSgf7nZ0wQq4CRc8ocSsokVQe3GMnGia';
 
-const SUB_ICONS = ['⚙️', '📡', '🔧'];
+const SUB_ICONS = ['◈', '▪', '▴'];
 const SUB_DEFAULTS = ['Hjulbalansering', 'TPMS-Service', 'Fälgar'];
 
 const SERVICES = [
@@ -77,7 +77,7 @@ function BookingModal({ open, onClose, primary }: { open: boolean; onClose: () =
         <div style={{ padding: '24px 32px' }}>
           {status === 'success' ? (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
-              <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
+              <div style={{ fontSize: 56, marginBottom: 16, color: '#16a34a' }}>✓</div>
               <h3 style={{ fontFamily: HEADLINE, fontSize: 24, fontWeight: 700, textTransform: 'uppercase', margin: '0 0 8px' }}>Bokning mottagen!</h3>
               <p style={{ fontFamily: BODY, fontSize: 14, color: '#5f5e5e', marginBottom: 32 }}>Vi bekräftar din bokning via e-post inom kort.</p>
               <button onClick={handleClose} style={{ fontFamily: HEADLINE, background: primary, color: 'white', border: 'none', padding: '14px 32px', fontSize: 14, fontWeight: 600, textTransform: 'uppercase', cursor: 'pointer' }}>
@@ -286,7 +286,7 @@ export default function VerkstadTemplate({ content, editMode, selectedSection, o
 
           <div style={{ gridColumn: 'span 4', background: primary, padding: 32, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderBottom: '8px solid rgba(0,0,0,0.25)', color: 'white' }}>
             <div>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>🏨</div>
+              <div style={{ fontSize: 48, marginBottom: 16, fontWeight: 700, lineHeight: 1 }}>▦</div>
               <h3 style={{ fontFamily: HEADLINE, fontSize: 28, fontWeight: 600, textTransform: 'uppercase', margin: '0 0 16px' }}>{hotelService}</h3>
               <p style={{ fontFamily: BODY, fontSize: 14, opacity: 0.9, lineHeight: 1.7, margin: 0 }}>Vi tar hand om dina däck under optimala förhållanden till nästa säsong.</p>
             </div>
@@ -332,7 +332,7 @@ export default function VerkstadTemplate({ content, editMode, selectedSection, o
 
             <div style={{ border: '1px solid #eeeeee', display: 'flex', background: 'white', overflow: 'hidden' }}>
               <div style={{ width: '50%', padding: 32, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', borderRight: '1px solid #eeeeee' }}>
-                <div style={{ fontSize: 56, marginBottom: 8 }}>☀️</div>
+                <div style={{ fontSize: 56, marginBottom: 8, color: primary, lineHeight: 1 }}>◎</div>
                 <h3 style={{ fontFamily: HEADLINE, fontSize: 22, fontWeight: 600, textTransform: 'uppercase', color: '#1a1c1c', lineHeight: 1.2, margin: '0 0 16px' }}>Sommardäck<br />Special</h3>
                 <div style={{ fontFamily: BODY, fontSize: 13, color: '#5f5e5e', textTransform: 'uppercase', marginBottom: 4 }}>Spara upp till</div>
                 <div style={{ fontFamily: HEADLINE, fontSize: 60, fontWeight: 700, color: primary, lineHeight: 1 }}>20%</div>
