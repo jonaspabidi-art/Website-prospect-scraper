@@ -547,7 +547,8 @@ export default function EditDemoPage({ params }: { params: Promise<{ id: string 
               overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
               background: 'white', pointerEvents: 'none',
             }}>
-              <div style={{ transform: 'scale(0.5)', transformOrigin: 'top left', width: '200%' }}>
+              {/* zoom skalar layout + höjd korrekt, till skillnad från transform:scale */}
+              <div style={{ zoom: 0.305 } as React.CSSProperties}>
                 {renderTemplate(demo.template, content)}
               </div>
             </div>
