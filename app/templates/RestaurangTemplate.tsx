@@ -1,7 +1,18 @@
-import type { DemoContent } from './types';
+'use client';
 
-export default function RestaurangTemplate({ content }: { content: DemoContent }) {
+import type { DemoContent } from './types';
+import EditableSection from './EditableSection';
+
+interface RestaurangProps {
+  content: DemoContent;
+  editMode?: boolean;
+  selectedSection?: string | null;
+  onSectionClick?: (id: string) => void;
+}
+
+export default function RestaurangTemplate({ content, editMode, selectedSection, onSectionClick }: RestaurangProps) {
   const c = content.primaryColor;
+  const sel = (id: string) => selectedSection === id;
   const bg = content.heroImageUrl
     ? `linear-gradient(rgba(0,0,0,0.52), rgba(0,0,0,0.52)), url(${content.heroImageUrl}) center/cover no-repeat`
     : `linear-gradient(135deg, #1a1209 0%, #3d2a0e 60%, #5c3d14 100%)`;
@@ -9,9 +20,10 @@ export default function RestaurangTemplate({ content }: { content: DemoContent }
   return (
     <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", color: '#1a1209', minHeight: '100vh', background: '#fdf8f0' }}>
       {/* Hero */}
+      <EditableSection id="hero" editMode={editMode} selected={sel('hero')} onSelect={onSectionClick}>
       <section style={{ background: bg, minHeight: 480, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', textAlign: 'center' }}>
         {content.logoUrl && (
-          <img src={content.logoUrl} alt="Logo" style={{ height: 64, marginBottom: 24, objectFit: 'contain' }} />
+          <img src={content.logoUrl} alt="Logo" style={{ height: content.logoHeight ?? 64, maxWidth: (content.logoHeight ?? 64) * 4, marginBottom: 24, objectFit: 'contain' }} />
         )}
         <h1 style={{ fontSize: 'clamp(32px, 6vw, 56px)', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
           {content.businessName}
@@ -35,14 +47,18 @@ export default function RestaurangTemplate({ content }: { content: DemoContent }
           </a>
         </div>
       </section>
+      </EditableSection>
 
       {/* About */}
+      <EditableSection id="about" editMode={editMode} selected={sel('about')} onSelect={onSectionClick}>
       <section style={{ maxWidth: 720, margin: '0 auto', padding: '64px 24px 48px', textAlign: 'center' }}>
         <p style={{ fontSize: 18, lineHeight: 1.75, color: '#4a3520' }}>{content.description}</p>
       </section>
+      </EditableSection>
 
       {/* Menu */}
       {content.menuItems && content.menuItems.length > 0 && (
+        <EditableSection id="menu" editMode={editMode} selected={sel('menu')} onSelect={onSectionClick}>
         <section id="meny" style={{ background: '#fff', padding: '56px 24px' }}>
           <div style={{ maxWidth: 840, margin: '0 auto' }}>
             <h2 style={{ textAlign: 'center', fontSize: 32, fontWeight: 700, marginBottom: 40, letterSpacing: '-0.02em' }}>Vår meny</h2>
@@ -61,9 +77,27 @@ export default function RestaurangTemplate({ content }: { content: DemoContent }
             </div>
           </div>
         </section>
+        </EditableSection>
+      )}
+
+      {/* Galleri (optional) */}
+      {content.galleryImages && content.galleryImages.filter(Boolean).length > 0 && (
+        <EditableSection id="gallery" editMode={editMode} selected={sel('gallery')} onSelect={onSectionClick}>
+        <section style={{ padding: '56px 24px', background: '#fdf8f0' }}>
+          <div style={{ maxWidth: 840, margin: '0 auto' }}>
+            <h2 style={{ textAlign: 'center', fontSize: 32, fontWeight: 700, marginBottom: 32, letterSpacing: '-0.02em' }}>Galleri</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+              {content.galleryImages.filter(Boolean).map((url, i) => (
+                <img key={i} src={url} alt="" style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', borderRadius: 12 }} />
+              ))}
+            </div>
+          </div>
+        </section>
+        </EditableSection>
       )}
 
       {/* Info */}
+      <EditableSection id="contact" editMode={editMode} selected={sel('contact')} onSelect={onSectionClick}>
       <section style={{ maxWidth: 840, margin: '0 auto', padding: '56px 24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 24 }}>
           {content.openingHours && (
@@ -74,6 +108,7 @@ export default function RestaurangTemplate({ content }: { content: DemoContent }
           <InfoCard icon="✉️" title="E-post" text={content.email} accent={c} />
         </div>
       </section>
+      </EditableSection>
 
       {/* Footer */}
       <footer style={{ background: '#1a1209', color: 'rgba(255,255,255,0.55)', textAlign: 'center', padding: '28px 24px', fontSize: 13 }}>

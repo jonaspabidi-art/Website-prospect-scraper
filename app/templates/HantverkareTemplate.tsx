@@ -1,16 +1,28 @@
-import type { DemoContent } from './types';
+'use client';
 
-export default function HantverkareTemplate({ content }: { content: DemoContent }) {
+import type { DemoContent } from './types';
+import EditableSection from './EditableSection';
+
+interface HantverkareProps {
+  content: DemoContent;
+  editMode?: boolean;
+  selectedSection?: string | null;
+  onSectionClick?: (id: string) => void;
+}
+
+export default function HantverkareTemplate({ content, editMode, selectedSection, onSectionClick }: HantverkareProps) {
   const c = content.primaryColor;
   const cLight = `${c}18`;
+  const sel = (id: string) => selectedSection === id;
 
   return (
     <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", color: '#111827', minHeight: '100vh', background: '#f8fafc' }}>
       {/* Nav */}
+      <EditableSection id="header" editMode={editMode} selected={sel('header')} onSelect={onSectionClick} outerStyle={{ position: 'sticky', top: 0, zIndex: 10 }}>
       <nav style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {content.logoUrl
-            ? <img src={content.logoUrl} alt="Logo" style={{ height: 40, objectFit: 'contain' }} />
+            ? <img src={content.logoUrl} alt="Logo" style={{ height: content.logoHeight ?? 40, maxWidth: (content.logoHeight ?? 40) * 4, objectFit: 'contain' }} />
             : <span style={{ fontWeight: 800, fontSize: 20, color: c }}>{content.businessName}</span>
           }
         </div>
@@ -21,8 +33,10 @@ export default function HantverkareTemplate({ content }: { content: DemoContent 
           Kontakta oss
         </a>
       </nav>
+      </EditableSection>
 
       {/* Hero */}
+      <EditableSection id="hero" editMode={editMode} selected={sel('hero')} onSelect={onSectionClick}>
       <section style={{
         background: content.heroImageUrl
           ? `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url(${content.heroImageUrl}) center/cover`
@@ -53,6 +67,7 @@ export default function HantverkareTemplate({ content }: { content: DemoContent 
           </div>
         </div>
       </section>
+      </EditableSection>
 
       {/* Trust bar */}
       <div style={{ background: c, padding: '16px 32px' }}>
@@ -65,6 +80,7 @@ export default function HantverkareTemplate({ content }: { content: DemoContent 
 
       {/* Services */}
       {content.serviceList && content.serviceList.length > 0 && (
+        <EditableSection id="services" editMode={editMode} selected={sel('services')} onSelect={onSectionClick}>
         <section style={{ maxWidth: 900, margin: '0 auto', padding: '64px 32px' }}>
           <h2 style={{ textAlign: 'center', fontSize: 30, fontWeight: 700, marginBottom: 40, letterSpacing: '-0.02em' }}>Vad vi erbjuder</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
@@ -80,10 +96,12 @@ export default function HantverkareTemplate({ content }: { content: DemoContent 
             ))}
           </div>
         </section>
+        </EditableSection>
       )}
 
       {/* Gallery */}
       {content.galleryImages && content.galleryImages.filter(Boolean).length > 0 && (
+        <EditableSection id="gallery" editMode={editMode} selected={sel('gallery')} onSelect={onSectionClick}>
         <section style={{ background: '#fff', padding: '56px 32px' }}>
           <div style={{ maxWidth: 900, margin: '0 auto' }}>
             <h2 style={{ textAlign: 'center', fontSize: 30, fontWeight: 700, marginBottom: 32, letterSpacing: '-0.02em' }}>Utfört arbete</h2>
@@ -94,9 +112,11 @@ export default function HantverkareTemplate({ content }: { content: DemoContent 
             </div>
           </div>
         </section>
+        </EditableSection>
       )}
 
       {/* Contact */}
+      <EditableSection id="contact" editMode={editMode} selected={sel('contact')} onSelect={onSectionClick}>
       <section style={{ background: cLight, padding: '56px 32px' }}>
         <div style={{ maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
           <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>Kontakta oss idag</h2>
@@ -108,6 +128,7 @@ export default function HantverkareTemplate({ content }: { content: DemoContent 
           </div>
         </div>
       </section>
+      </EditableSection>
 
       <footer style={{ background: '#1e293b', color: 'rgba(255,255,255,0.5)', textAlign: 'center', padding: '24px 32px', fontSize: 13 }}>
         © {new Date().getFullYear()} {content.businessName} · {content.address}

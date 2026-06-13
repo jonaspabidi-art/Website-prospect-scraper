@@ -19,6 +19,7 @@ export interface DemoContent {
   email: string;
   address: string;
   logoUrl: string | null;
+  logoHeight?: number;
   heroImageUrl: string | null;
   primaryColor: string;
   // restaurang

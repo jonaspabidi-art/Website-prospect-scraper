@@ -1,15 +1,27 @@
-import type { DemoContent } from './types';
+'use client';
 
-export default function TjansteforetagTemplate({ content }: { content: DemoContent }) {
+import type { DemoContent } from './types';
+import EditableSection from './EditableSection';
+
+interface TjansteforetagProps {
+  content: DemoContent;
+  editMode?: boolean;
+  selectedSection?: string | null;
+  onSectionClick?: (id: string) => void;
+}
+
+export default function TjansteforetagTemplate({ content, editMode, selectedSection, onSectionClick }: TjansteforetagProps) {
   const c = content.primaryColor;
+  const sel = (id: string) => selectedSection === id;
 
   return (
     <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", color: '#111827', minHeight: '100vh' }}>
       {/* Nav */}
+      <EditableSection id="header" editMode={editMode} selected={sel('header')} onSelect={onSectionClick} outerStyle={{ position: 'sticky', top: 0, zIndex: 10 }}>
       <nav style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 68, position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {content.logoUrl
-            ? <img src={content.logoUrl} alt="Logo" style={{ height: 38, objectFit: 'contain' }} />
+            ? <img src={content.logoUrl} alt="Logo" style={{ height: content.logoHeight ?? 38, maxWidth: (content.logoHeight ?? 38) * 4, objectFit: 'contain' }} />
             : <span style={{ fontWeight: 800, fontSize: 20, background: `linear-gradient(135deg, ${c}, #4f46e5)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{content.businessName}</span>
           }
         </div>
@@ -21,8 +33,10 @@ export default function TjansteforetagTemplate({ content }: { content: DemoConte
           }}>Ring oss</a>
         </div>
       </nav>
+      </EditableSection>
 
       {/* Hero */}
+      <EditableSection id="hero" editMode={editMode} selected={sel('hero')} onSelect={onSectionClick}>
       <section style={{
         background: `linear-gradient(135deg, #f5f3ff 0%, #ede9fe 40%, #fff 100%)`,
         padding: '100px 40px 80px',
@@ -64,9 +78,11 @@ export default function TjansteforetagTemplate({ content }: { content: DemoConte
           </div>
         </div>
       </section>
+      </EditableSection>
 
       {/* Services */}
       {content.serviceFeatures && content.serviceFeatures.length > 0 && (
+        <EditableSection id="services" editMode={editMode} selected={sel('services')} onSelect={onSectionClick}>
         <section style={{ background: '#fff', padding: '80px 40px' }}>
           <div style={{ maxWidth: 960, margin: '0 auto' }}>
             <h2 style={{ textAlign: 'center', fontSize: 32, fontWeight: 700, marginBottom: 12, letterSpacing: '-0.02em' }}>Vad vi erbjuder</h2>
@@ -77,7 +93,6 @@ export default function TjansteforetagTemplate({ content }: { content: DemoConte
               {content.serviceFeatures.map((f, i) => (
                 <div key={i} style={{
                   border: '1.5px solid #e5e7eb', borderRadius: 16, padding: '28px 24px',
-                  transition: 'border-color 0.2s',
                 }}>
                   <div style={{
                     width: 44, height: 44, borderRadius: 12,
@@ -93,9 +108,27 @@ export default function TjansteforetagTemplate({ content }: { content: DemoConte
             </div>
           </div>
         </section>
+        </EditableSection>
+      )}
+
+      {/* Galleri (optional) */}
+      {content.galleryImages && content.galleryImages.filter(Boolean).length > 0 && (
+        <EditableSection id="gallery" editMode={editMode} selected={sel('gallery')} onSelect={onSectionClick}>
+        <section style={{ padding: '56px 40px' }}>
+          <div style={{ maxWidth: 960, margin: '0 auto' }}>
+            <h2 style={{ textAlign: 'center', fontSize: 32, fontWeight: 700, marginBottom: 32, letterSpacing: '-0.02em' }}>Galleri</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+              {content.galleryImages.filter(Boolean).map((url, i) => (
+                <img key={i} src={url} alt="" style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', borderRadius: 12 }} />
+              ))}
+            </div>
+          </div>
+        </section>
+        </EditableSection>
       )}
 
       {/* CTA */}
+      <EditableSection id="cta" editMode={editMode} selected={sel('cta')} onSelect={onSectionClick}>
       <section style={{ background: `linear-gradient(135deg, ${c} 0%, #4f46e5 100%)`, padding: '64px 40px', textAlign: 'center' }}>
         <h2 style={{ fontSize: 32, fontWeight: 700, color: '#fff', margin: '0 0 16px', letterSpacing: '-0.02em' }}>
           Redo att ta nästa steg?
@@ -119,6 +152,7 @@ export default function TjansteforetagTemplate({ content }: { content: DemoConte
           </a>
         </div>
       </section>
+      </EditableSection>
 
       <footer style={{ background: '#0f0e17', color: 'rgba(255,255,255,0.45)', textAlign: 'center', padding: '24px 32px', fontSize: 13 }}>
         © {new Date().getFullYear()} {content.businessName} · {content.address}

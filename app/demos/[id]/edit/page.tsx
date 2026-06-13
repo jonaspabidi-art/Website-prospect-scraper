@@ -10,16 +10,71 @@ const HantverkareTemplate = dynamic(() => import('@/app/templates/HantverkareTem
 const TjansteforetagTemplate = dynamic(() => import('@/app/templates/TjansteforetagTemplate'), { ssr: false });
 const VerkstadTemplate = dynamic(() => import('@/app/templates/VerkstadTemplate'), { ssr: false });
 
-function renderTemplate(template: TemplateId, content: DemoContent) {
+interface EditProps {
+  editMode: boolean;
+  selectedSection: string | null;
+  onSectionClick: (id: string) => void;
+}
+
+function renderTemplate(template: TemplateId, content: DemoContent, editProps: EditProps) {
   switch (template) {
-    case 'restaurang': return <RestaurangTemplate content={content} />;
-    case 'hantverkare': return <HantverkareTemplate content={content} />;
-    case 'tjansteforetag': return <TjansteforetagTemplate content={content} />;
-    case 'verkstad': return <VerkstadTemplate content={content} />;
+    case 'restaurang': return <RestaurangTemplate content={content} {...editProps} />;
+    case 'hantverkare': return <HantverkareTemplate content={content} {...editProps} />;
+    case 'tjansteforetag': return <TjansteforetagTemplate content={content} {...editProps} />;
+    case 'verkstad': return <VerkstadTemplate content={content} {...editProps} />;
   }
 }
 
-// ── AI popup ────────────────────────────────────────────
+// ── Section definitions per template ────────────────────────
+type SectionDef = { id: string; label: string; icon: string };
+
+const TEMPLATE_SECTIONS: Record<TemplateId, SectionDef[]> = {
+  verkstad: [
+    { id: 'header', label: 'Header & Logo', icon: '⬛' },
+    { id: 'hero', label: 'Hero', icon: '🖼' },
+    { id: 'services', label: 'Tjänster', icon: '⚙️' },
+    { id: 'offers', label: 'Erbjudanden', icon: '💰' },
+    { id: 'contact', label: 'Kontakt & öppettider', icon: '📍' },
+    { id: 'brands', label: 'Märken', icon: '🏷' },
+  ],
+  restaurang: [
+    { id: 'hero', label: 'Hero & Logo', icon: '🖼' },
+    { id: 'about', label: 'Om oss', icon: '📝' },
+    { id: 'menu', label: 'Meny', icon: '🍽' },
+    { id: 'contact', label: 'Kontakt & öppettider', icon: '📍' },
+  ],
+  hantverkare: [
+    { id: 'header', label: 'Header & Logo', icon: '⬛' },
+    { id: 'hero', label: 'Hero', icon: '🖼' },
+    { id: 'services', label: 'Tjänster', icon: '⚙️' },
+    { id: 'contact', label: 'Kontakt', icon: '📍' },
+  ],
+  tjansteforetag: [
+    { id: 'header', label: 'Header & Logo', icon: '⬛' },
+    { id: 'hero', label: 'Hero', icon: '🖼' },
+    { id: 'services', label: 'Tjänster', icon: '⚙️' },
+    { id: 'cta', label: 'Kontakt-sektion', icon: '✨' },
+  ],
+};
+
+// ── Shared input style ────────────────────────────────────────
+const inp: React.CSSProperties = {
+  width: '100%', boxSizing: 'border-box', padding: '7px 10px', fontSize: 13,
+  border: '1px solid var(--border)', borderRadius: 8,
+  background: 'var(--bg)', color: 'var(--text)', outline: 'none',
+};
+
+// ── Field row ────────────────────────────────────────────────
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+// ── AI button ────────────────────────────────────────────────
 function AIButton({ field, value, template, businessName, onResult }: {
   field: string; value: string; template: TemplateId; businessName: string;
   onResult: (text: string) => void;
@@ -49,25 +104,18 @@ function AIButton({ field, value, template, businessName, onResult }: {
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        title="Förbättra med AI"
-        style={{
-          width: 26, height: 26, borderRadius: 6,
-          border: '1px solid var(--border)',
-          background: open ? 'var(--accent-soft)' : 'var(--bg)',
-          color: open ? 'var(--accent)' : 'var(--text-muted)',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          fontSize: 14,
-        }}
-      >✦</button>
+      <button type="button" onClick={() => setOpen(o => !o)} title="Förbättra med AI" style={{
+        width: 26, height: 26, borderRadius: 6,
+        border: '1px solid var(--border)',
+        background: open ? 'var(--accent-soft)' : 'var(--bg)',
+        color: open ? 'var(--accent)' : 'var(--text-muted)',
+        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14,
+      }}>✦</button>
       {open && (
         <div style={{
           position: 'absolute', top: 32, right: 0, zIndex: 50,
           background: 'var(--bg)', border: '1px solid var(--border)',
-          borderRadius: 10, padding: 14, width: 260,
-          boxShadow: 'var(--shadow-lg)',
+          borderRadius: 10, padding: 14, width: 260, boxShadow: 'var(--shadow-lg)',
         }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Beskriv vad du vill ändra</div>
           <textarea
@@ -75,23 +123,11 @@ function AIButton({ field, value, template, businessName, onResult }: {
             onChange={e => setInstruction(e.target.value)}
             placeholder="t.ex. Gör det mer säljande och kortare"
             rows={2}
-            style={{
-              width: '100%', boxSizing: 'border-box', padding: '7px 9px', fontSize: 13,
-              border: '1px solid var(--border)', borderRadius: 7,
-              background: 'var(--bg-subtle)', color: 'var(--text)',
-              resize: 'none', outline: 'none',
-            }}
+            style={{ width: '100%', boxSizing: 'border-box', padding: '7px 9px', fontSize: 13, border: '1px solid var(--border)', borderRadius: 7, background: 'var(--bg-subtle)', color: 'var(--text)', resize: 'none', outline: 'none' }}
           />
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button type="button" onClick={() => setOpen(false)} style={{
-              flex: 1, padding: '7px 0', fontSize: 12, borderRadius: 7,
-              border: '1px solid var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer',
-            }}>Avbryt</button>
-            <button type="button" onClick={run} disabled={loading || !instruction.trim()} style={{
-              flex: 1, padding: '7px 0', fontSize: 12, fontWeight: 600, borderRadius: 7,
-              border: 'none', background: 'var(--accent)', color: '#fff', cursor: loading ? 'default' : 'pointer',
-              opacity: loading ? 0.7 : 1,
-            }}>{loading ? '...' : 'Generera'}</button>
+            <button type="button" onClick={() => setOpen(false)} style={{ flex: 1, padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px solid var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>Avbryt</button>
+            <button type="button" onClick={run} disabled={loading || !instruction.trim()} style={{ flex: 1, padding: '7px 0', fontSize: 12, fontWeight: 600, borderRadius: 7, border: 'none', background: 'var(--accent)', color: '#fff', cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.7 : 1 }}>{loading ? '...' : 'Generera'}</button>
           </div>
         </div>
       )}
@@ -99,25 +135,9 @@ function AIButton({ field, value, template, businessName, onResult }: {
   );
 }
 
-// ── Field components ─────────────────────────────────────
-function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{label}</label>
-      {children}
-    </div>
-  );
-}
-
-const inp: React.CSSProperties = {
-  width: '100%', boxSizing: 'border-box', padding: '7px 10px', fontSize: 13,
-  border: '1px solid var(--border)', borderRadius: 8,
-  background: 'var(--bg)', color: 'var(--text)', outline: 'none',
-};
-
-// ── Image uploader ────────────────────────────────────────
-function ImageUpload({ label, value, field, demoId, onChange }: {
-  label: string; value: string | null; field: string; demoId: string; onChange: (url: string | null) => void;
+// ── Image uploader ────────────────────────────────────────────
+function ImageUpload({ label, value, demoId, onChange }: {
+  label: string; value: string | null; demoId: string; onChange: (url: string | null) => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,67 +152,340 @@ function ImageUpload({ label, value, field, demoId, onChange }: {
       fd.append('file', file);
       const res = await fetch(`/api/demos/${demoId}/upload`, { method: 'POST', body: fd });
       const data = await res.json();
-      if (data.url) {
-        onChange(data.url);
-      } else {
-        setError(data.error || `Fel ${res.status}`);
-      }
+      if (data.url) onChange(data.url);
+      else setError(data.error || `Fel ${res.status}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nätverksfel');
-    } finally {
-      setUploading(false);
-      e.target.value = '';
-    }
+    } finally { setUploading(false); e.target.value = ''; }
   };
 
   return (
     <FieldRow label={label}>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        {value && <img src={value} alt="" style={{ height: 40, width: 40, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />}
-        <label style={{
-          padding: '7px 12px', fontSize: 12, fontWeight: 500, borderRadius: 7,
-          border: '1px solid var(--border)', background: 'var(--bg-subtle)',
-          color: 'var(--text-muted)', cursor: uploading ? 'default' : 'pointer',
-          flexShrink: 0,
-        }}>
-          {uploading ? 'Laddar upp...' : value ? 'Byt bild' : 'Välj bild'}
-          <input type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} disabled={uploading} />
-        </label>
-        {value && (
-          <button type="button" onClick={() => onChange(null)} style={{
-            background: 'none', border: '1px solid var(--red-border)', color: 'var(--red)',
-            borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer',
-          }}>Ta bort</button>
-        )}
+      <div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {value && <img src={value} alt="" style={{ height: 40, width: 60, objectFit: 'contain', borderRadius: 6, border: '1px solid var(--border)', background: '#f0f0f0' }} />}
+          <label style={{ padding: '7px 12px', fontSize: 12, fontWeight: 500, borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-subtle)', color: 'var(--text-muted)', cursor: uploading ? 'default' : 'pointer', flexShrink: 0 }}>
+            {uploading ? 'Laddar upp...' : value ? 'Byt bild' : 'Välj bild'}
+            <input type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} disabled={uploading} />
+          </label>
+          {value && (
+            <button type="button" onClick={() => onChange(null)} style={{ background: 'none', border: '1px solid var(--red-border)', color: 'var(--red)', borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}>Ta bort</button>
+          )}
+        </div>
+        {error && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>⚠ {error}</div>}
       </div>
-      {error && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>⚠ {error}</div>}
     </FieldRow>
   );
 }
 
-// ── Section accordion ─────────────────────────────────────
-function Section({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
+// ── Gallery image uploader ────────────────────────────────────
+function GalleryUploadButton({ demoId, onAdd }: { demoId: string; onAdd: (url: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`/api/demos/${demoId}/upload`, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.url) onAdd(data.url);
+      else setError(data.error || `Fel ${res.status}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nätverksfel');
+    } finally { setUploading(false); e.target.value = ''; }
+  };
+
   return (
-    <div style={{ borderBottom: '1px solid var(--border)' }}>
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width: '100%', padding: '12px 16px', display: 'flex', justifyContent: 'space-between',
-          alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer',
-          fontSize: 13, fontWeight: 600, color: 'var(--text)', textAlign: 'left',
-        }}
-      >
-        {title}
-        <span style={{ color: 'var(--text-faint)', fontSize: 12, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
-      </button>
-      {open && <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>{children}</div>}
+    <div>
+      <label style={{ display: 'block', padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: uploading ? 'default' : 'pointer', textAlign: 'center' }}>
+        {uploading ? 'Laddar upp...' : '+ Lägg till bild'}
+        <input type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} disabled={uploading} />
+      </label>
+      {error && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>⚠ {error}</div>}
     </div>
   );
 }
 
-// ── Main builder ──────────────────────────────────────────
+// ── Section controls ──────────────────────────────────────────
+function SectionControls({
+  section, template, content, set, demoId,
+}: {
+  section: string;
+  template: TemplateId;
+  content: DemoContent;
+  set: <K extends keyof DemoContent>(k: K, v: DemoContent[K]) => void;
+  demoId: string;
+}) {
+  const setMenuItem = (i: number, key: keyof MenuItem, val: string) => {
+    const items = [...(content.menuItems || [])];
+    items[i] = { ...items[i], [key]: val };
+    set('menuItems', items);
+  };
+  const setServiceFeature = (i: number, key: keyof ServiceFeature, val: string) => {
+    const items = [...(content.serviceFeatures || [])];
+    items[i] = { ...items[i], [key]: val };
+    set('serviceFeatures', items);
+  };
+  const setServiceListItem = (i: number, val: string) => {
+    const items = [...(content.serviceList || [])];
+    items[i] = val;
+    set('serviceList', items);
+  };
+  const setBrand = (i: number, val: string) => {
+    const items = [...(content.brands || [])];
+    items[i] = val;
+    set('brands', items);
+  };
+
+  switch (section) {
+    case 'header':
+      return (
+        <>
+          <ImageUpload label="Logo" value={content.logoUrl} demoId={demoId} onChange={v => set('logoUrl', v)} />
+          {content.logoUrl && (
+            <FieldRow label={`Logostorlek — ${content.logoHeight ?? 40}px`}>
+              <input
+                type="range" min={20} max={120} step={2}
+                value={content.logoHeight ?? 40}
+                onChange={e => set('logoHeight', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+            </FieldRow>
+          )}
+          <FieldRow label="Företagsnamn">
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input style={inp} value={content.businessName} onChange={e => set('businessName', e.target.value)} />
+              <AIButton field="businessName" value={content.businessName} template={template} businessName={content.businessName} onResult={v => set('businessName', v)} />
+            </div>
+          </FieldRow>
+        </>
+      );
+
+    case 'hero':
+      return (
+        <>
+          <ImageUpload label="Bakgrundsbild" value={content.heroImageUrl} demoId={demoId} onChange={v => set('heroImageUrl', v)} />
+          {template === 'restaurang' && (
+            <>
+              <ImageUpload label="Logo" value={content.logoUrl} demoId={demoId} onChange={v => set('logoUrl', v)} />
+              {content.logoUrl && (
+                <FieldRow label={`Logostorlek — ${content.logoHeight ?? 56}px`}>
+                  <input
+                    type="range" min={20} max={120} step={2}
+                    value={content.logoHeight ?? 56}
+                    onChange={e => set('logoHeight', Number(e.target.value))}
+                    style={{ width: '100%', cursor: 'pointer' }}
+                  />
+                </FieldRow>
+              )}
+            </>
+          )}
+          <FieldRow label="Företagsnamn">
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input style={inp} value={content.businessName} onChange={e => set('businessName', e.target.value)} />
+              <AIButton field="businessName" value={content.businessName} template={template} businessName={content.businessName} onResult={v => set('businessName', v)} />
+            </div>
+          </FieldRow>
+          <FieldRow label="Tagline / Slogan">
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input style={inp} value={content.tagline} onChange={e => set('tagline', e.target.value)} />
+              <AIButton field="tagline" value={content.tagline} template={template} businessName={content.businessName} onResult={v => set('tagline', v)} />
+            </div>
+          </FieldRow>
+          {template !== 'verkstad' && (
+            <FieldRow label="Beskrivning">
+              <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                <textarea style={{ ...inp, resize: 'vertical', minHeight: 72 }} value={content.description} onChange={e => set('description', e.target.value)} />
+                <AIButton field="description" value={content.description} template={template} businessName={content.businessName} onResult={v => set('description', v)} />
+              </div>
+            </FieldRow>
+          )}
+        </>
+      );
+
+    case 'about':
+      return (
+        <FieldRow label="Beskrivning">
+          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+            <textarea style={{ ...inp, resize: 'vertical', minHeight: 100 }} value={content.description} onChange={e => set('description', e.target.value)} />
+            <AIButton field="description" value={content.description} template={template} businessName={content.businessName} onResult={v => set('description', v)} />
+          </div>
+        </FieldRow>
+      );
+
+    case 'services':
+      if (template === 'tjansteforetag') {
+        return (
+          <>
+            {(content.serviceFeatures || []).map((f, i) => (
+              <div key={i} style={{ background: 'var(--bg)', borderRadius: 8, padding: 10, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>Tjänst {i + 1}</span>
+                  <button type="button" onClick={() => set('serviceFeatures', (content.serviceFeatures || []).filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 16 }}>×</button>
+                </div>
+                <input style={inp} placeholder="Titel" value={f.title} onChange={e => setServiceFeature(i, 'title', e.target.value)} />
+                <textarea style={{ ...inp, resize: 'vertical', minHeight: 52 }} placeholder="Beskrivning" value={f.description} onChange={e => setServiceFeature(i, 'description', e.target.value)} />
+              </div>
+            ))}
+            <button type="button" onClick={() => set('serviceFeatures', [...(content.serviceFeatures || []), { title: '', description: '' }])} style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              + Lägg till tjänst
+            </button>
+          </>
+        );
+      }
+      if (template === 'verkstad') {
+        return (
+          <>
+            <FieldRow label="Beskrivning">
+              <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                <textarea style={{ ...inp, resize: 'vertical', minHeight: 72 }} value={content.description} onChange={e => set('description', e.target.value)} />
+                <AIButton field="description" value={content.description} template={template} businessName={content.businessName} onResult={v => set('description', v)} />
+              </div>
+            </FieldRow>
+            <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+            {(content.serviceList || []).map((s, i) => (
+              <div key={i} style={{ display: 'flex', gap: 6 }}>
+                <input style={{ ...inp, flex: 1 }} value={s} onChange={e => setServiceListItem(i, e.target.value)} placeholder={`Tjänst ${i + 1}`} />
+                <button type="button" onClick={() => set('serviceList', (content.serviceList || []).filter((_, j) => j !== i))} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '0 8px', color: 'var(--text-faint)', cursor: 'pointer' }}>×</button>
+              </div>
+            ))}
+            <button type="button" onClick={() => set('serviceList', [...(content.serviceList || []), ''])} style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              + Lägg till tjänst
+            </button>
+          </>
+        );
+      }
+      // hantverkare
+      return (
+        <>
+          {(content.serviceList || []).map((s, i) => (
+            <div key={i} style={{ display: 'flex', gap: 6 }}>
+              <input style={{ ...inp, flex: 1 }} value={s} onChange={e => setServiceListItem(i, e.target.value)} placeholder={`Tjänst ${i + 1}`} />
+              <button type="button" onClick={() => set('serviceList', (content.serviceList || []).filter((_, j) => j !== i))} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '0 8px', color: 'var(--text-faint)', cursor: 'pointer' }}>×</button>
+            </div>
+          ))}
+          <button type="button" onClick={() => set('serviceList', [...(content.serviceList || []), ''])} style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+            + Lägg till tjänst
+          </button>
+        </>
+      );
+
+    case 'menu':
+      return (
+        <>
+          {(content.menuItems || []).map((item, i) => (
+            <div key={i} style={{ background: 'var(--bg)', borderRadius: 8, padding: 10, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>Rätt {i + 1}</span>
+                <button type="button" onClick={() => set('menuItems', (content.menuItems || []).filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 16 }}>×</button>
+              </div>
+              <input style={inp} placeholder="Namn" value={item.name} onChange={e => setMenuItem(i, 'name', e.target.value)} />
+              <input style={inp} placeholder="Beskrivning" value={item.description} onChange={e => setMenuItem(i, 'description', e.target.value)} />
+              <input style={inp} placeholder="Pris (t.ex. 135 kr)" value={item.price} onChange={e => setMenuItem(i, 'price', e.target.value)} />
+            </div>
+          ))}
+          <button type="button" onClick={() => set('menuItems', [...(content.menuItems || []), { name: '', description: '', price: '' }])} style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+            + Lägg till rätt
+          </button>
+        </>
+      );
+
+    case 'gallery':
+      return (
+        <>
+          {(content.galleryImages || []).filter(Boolean).length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+              {(content.galleryImages || []).filter(Boolean).map((url, i) => (
+                <div key={i} style={{ position: 'relative' }}>
+                  <img src={url} alt="" style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', borderRadius: 6, display: 'block' }} />
+                  <button
+                    type="button"
+                    onClick={() => set('galleryImages', (content.galleryImages || []).filter((_, j) => j !== i))}
+                    style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '50%', width: 22, height: 22, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >×</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <GalleryUploadButton demoId={demoId} onAdd={url => set('galleryImages', [...(content.galleryImages || []), url])} />
+        </>
+      );
+
+    case 'brands':
+      return (
+        <>
+          {(content.brands || []).map((b, i) => (
+            <div key={i} style={{ display: 'flex', gap: 6 }}>
+              <input style={{ ...inp, flex: 1 }} value={b} onChange={e => setBrand(i, e.target.value)} placeholder={`Märke ${i + 1}`} />
+              <button type="button" onClick={() => set('brands', (content.brands || []).filter((_, j) => j !== i))} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '0 8px', color: 'var(--text-faint)', cursor: 'pointer' }}>×</button>
+            </div>
+          ))}
+          <button type="button" onClick={() => set('brands', [...(content.brands || []), ''])} style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+            + Lägg till märke
+          </button>
+        </>
+      );
+
+    case 'contact':
+      return (
+        <>
+          <FieldRow label="Telefon">
+            <input style={inp} value={content.phone} onChange={e => set('phone', e.target.value)} />
+          </FieldRow>
+          <FieldRow label="E-post">
+            <input style={inp} value={content.email} onChange={e => set('email', e.target.value)} />
+          </FieldRow>
+          <FieldRow label="Adress">
+            <input style={inp} value={content.address} onChange={e => set('address', e.target.value)} />
+          </FieldRow>
+          {(template === 'restaurang' || template === 'verkstad') && (
+            <FieldRow label="Öppettider">
+              <div style={{ display: 'flex', gap: 6 }}>
+                <textarea style={{ ...inp, resize: 'vertical', minHeight: 80 }} value={content.openingHours || ''} onChange={e => set('openingHours', e.target.value)} />
+                <AIButton field="openingHours" value={content.openingHours || ''} template={template} businessName={content.businessName} onResult={v => set('openingHours', v)} />
+              </div>
+            </FieldRow>
+          )}
+        </>
+      );
+
+    case 'offers':
+      return (
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+          Erbjudandena visas automatiskt baserat på dina tjänster och priser.
+        </p>
+      );
+
+    case 'cta':
+      return (
+        <>
+          <FieldRow label="Telefon">
+            <input style={inp} value={content.phone} onChange={e => set('phone', e.target.value)} />
+          </FieldRow>
+          <FieldRow label="E-post">
+            <input style={inp} value={content.email} onChange={e => set('email', e.target.value)} />
+          </FieldRow>
+        </>
+      );
+
+    default:
+      return null;
+  }
+}
+
+// ── Section label lookup ──────────────────────────────────────
+const SECTION_LABELS: Record<string, string> = {
+  header: 'Header & Logo', hero: 'Hero', services: 'Tjänster', offers: 'Erbjudanden',
+  contact: 'Kontakt', brands: 'Märken', about: 'Om oss', menu: 'Meny',
+  gallery: 'Galleri', cta: 'Kontakt-sektion',
+};
+
+// ── Main builder ──────────────────────────────────────────────
 export default function EditDemoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -203,6 +496,8 @@ export default function EditDemoPage({ params }: { params: Promise<{ id: string 
   const [publishing, setPublishing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const [selectedSection, setSelectedSection] = useState<string | null>(null);
+  const [showAddSection, setShowAddSection] = useState(false);
   const savedContentRef = useRef<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -233,7 +528,6 @@ export default function EditDemoPage({ params }: { params: Promise<{ id: string 
     setTimeout(() => setSaved(false), 2000);
   }, [id]);
 
-  // Auto-save 1.5s after last change
   useEffect(() => {
     if (!content) return;
     const str = JSON.stringify(content);
@@ -273,283 +567,183 @@ export default function EditDemoPage({ params }: { params: Promise<{ id: string 
   }
 
   const previewUrl = `/demos/preview/${demo.slug}`;
+  const sections = TEMPLATE_SECTIONS[demo.template];
+  const hasGallery = content.galleryImages !== undefined && content.galleryImages !== null;
 
-  const setMenuItem = (i: number, key: keyof MenuItem, val: string) => {
-    const items = [...(content.menuItems || [])];
-    items[i] = { ...items[i], [key]: val };
-    set('menuItems', items);
-  };
-
-  const setServiceFeature = (i: number, key: keyof ServiceFeature, val: string) => {
-    const items = [...(content.serviceFeatures || [])];
-    items[i] = { ...items[i], [key]: val };
-    set('serviceFeatures', items);
-  };
-
-  const setServiceListItem = (i: number, val: string) => {
-    const items = [...(content.serviceList || [])];
-    items[i] = val;
-    set('serviceList', items);
-  };
-
-  const setBrand = (i: number, val: string) => {
-    const items = [...(content.brands || [])];
-    items[i] = val;
-    set('brands', items);
+  const editProps: EditProps = {
+    editMode: true,
+    selectedSection,
+    onSectionClick: (id: string) => setSelectedSection(id),
   };
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       {/* ── Left panel ── */}
-      <div style={{
-        width: 320, flexShrink: 0, borderRight: '1px solid var(--border)',
-        overflowY: 'auto', display: 'flex', flexDirection: 'column',
-        background: 'var(--bg-subtle)',
-      }}>
-        {/* Header */}
+      <div style={{ width: 300, flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg-subtle)' }}>
+
+        {/* Top bar */}
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <button
-            onClick={() => router.push('/demos')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px 6px', fontSize: 18 }}
-          >←</button>
-          <div style={{ flex: 1, fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {demo.name}
-          </div>
-          <button
-            onClick={save}
-            disabled={saving}
-            style={{
-              padding: '6px 14px', fontSize: 12, fontWeight: 600, borderRadius: 7,
-              border: 'none', background: saved ? '#16a34a' : 'var(--accent)',
-              color: '#fff', cursor: saving ? 'default' : 'pointer', flexShrink: 0,
-            }}
-          >{saved ? '✓ Sparat' : saving ? '...' : 'Spara'}</button>
+          <button onClick={() => router.push('/demos')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px 6px', fontSize: 18 }}>←</button>
+          <div style={{ flex: 1, fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{demo.name}</div>
+          <button onClick={save} disabled={saving} style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, borderRadius: 7, border: 'none', background: saved ? '#16a34a' : 'var(--accent)', color: '#fff', cursor: saving ? 'default' : 'pointer', flexShrink: 0 }}>
+            {saved ? '✓ Sparat' : saving ? '...' : 'Spara'}
+          </button>
         </div>
 
-        {/* Publish + preview */}
+        {/* Publish row */}
         <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6, flexShrink: 0 }}>
-          <a
-            href={previewUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              padding: '7px 10px', fontSize: 12, fontWeight: 500,
-              border: '1px solid var(--border)', borderRadius: 7, textDecoration: 'none',
-              color: 'var(--text-muted)', background: 'var(--bg)', whiteSpace: 'nowrap',
-            }}
-          >↗ Preview</a>
-          <button
-            onClick={copyLink}
-            style={{
-              padding: '7px 10px', fontSize: 12, fontWeight: 500, borderRadius: 7,
-              border: '1px solid var(--border)', background: copied ? '#dcfce7' : 'var(--bg)',
-              color: copied ? '#15803d' : 'var(--text-muted)', cursor: 'pointer', whiteSpace: 'nowrap',
-            }}
-          >{copied ? '✓ Kopierat' : '🔗 Kopiera'}</button>
-          <button
-            onClick={togglePublish}
-            disabled={publishing}
-            style={{
-              flex: 1, padding: '7px 0', fontSize: 12, fontWeight: 600, borderRadius: 7,
-              border: 'none', cursor: publishing ? 'default' : 'pointer',
-              background: demo.published ? '#dcfce7' : 'var(--accent)',
-              color: demo.published ? '#15803d' : '#fff', whiteSpace: 'nowrap',
-            }}
-          >
+          <a href={previewUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '7px 10px', fontSize: 12, fontWeight: 500, border: '1px solid var(--border)', borderRadius: 7, textDecoration: 'none', color: 'var(--text-muted)', background: 'var(--bg)', whiteSpace: 'nowrap' }}>↗</a>
+          <button onClick={copyLink} style={{ padding: '7px 10px', fontSize: 12, fontWeight: 500, borderRadius: 7, border: '1px solid var(--border)', background: copied ? '#dcfce7' : 'var(--bg)', color: copied ? '#15803d' : 'var(--text-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            {copied ? '✓' : '🔗'}
+          </button>
+          <button onClick={togglePublish} disabled={publishing} style={{ flex: 1, padding: '7px 0', fontSize: 12, fontWeight: 600, borderRadius: 7, border: 'none', cursor: publishing ? 'default' : 'pointer', background: demo.published ? '#dcfce7' : 'var(--accent)', color: demo.published ? '#15803d' : '#fff', whiteSpace: 'nowrap' }}>
             {demo.published ? '✓ Publicerad' : 'Publicera'}
           </button>
         </div>
 
-        {/* Color picker */}
-        <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', flex: 1 }}>Accentfärg</span>
-          <input
-            type="color"
-            value={content.primaryColor}
-            onChange={e => set('primaryColor', e.target.value)}
-            style={{ width: 36, height: 28, border: '1px solid var(--border)', borderRadius: 6, padding: 2, cursor: 'pointer', background: 'none' }}
-          />
+        {/* Color + device toggle */}
+        <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <input type="color" value={content.primaryColor} onChange={e => set('primaryColor', e.target.value)} style={{ width: 28, height: 28, border: '1px solid var(--border)', borderRadius: 6, padding: 2, cursor: 'pointer', background: 'none', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1 }}>Accentfärg</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['desktop', 'mobile'] as const).map(d => (
+              <button key={d} onClick={() => setPreviewDevice(d)} style={{ padding: '4px 8px', fontSize: 11, borderRadius: 5, border: 'none', cursor: 'pointer', background: previewDevice === d ? '#1a1a1a' : 'transparent', color: previewDevice === d ? 'white' : 'var(--text-muted)' }}>
+                {d === 'desktop' ? '🖥' : '📱'}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Sections */}
-        <Section title="Allmänt" defaultOpen>
-          <FieldRow label="Företagsnamn">
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input style={inp} value={content.businessName} onChange={e => set('businessName', e.target.value)} />
-              <AIButton field="businessName" value={content.businessName} template={demo.template} businessName={content.businessName} onResult={v => set('businessName', v)} />
-            </div>
-          </FieldRow>
-          <FieldRow label="Tagline / Slogan">
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input style={inp} value={content.tagline} onChange={e => set('tagline', e.target.value)} />
-              <AIButton field="tagline" value={content.tagline} template={demo.template} businessName={content.businessName} onResult={v => set('tagline', v)} />
-            </div>
-          </FieldRow>
-          <FieldRow label="Beskrivning">
-            <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-              <textarea
-                style={{ ...inp, resize: 'vertical', minHeight: 72 }}
-                value={content.description}
-                onChange={e => set('description', e.target.value)}
-              />
-              <AIButton field="description" value={content.description} template={demo.template} businessName={content.businessName} onResult={v => set('description', v)} />
-            </div>
-          </FieldRow>
-        </Section>
-
-        <Section title="Kontakt & adress">
-          <FieldRow label="Telefon">
-            <input style={inp} value={content.phone} onChange={e => set('phone', e.target.value)} />
-          </FieldRow>
-          <FieldRow label="E-post">
-            <input style={inp} value={content.email} onChange={e => set('email', e.target.value)} />
-          </FieldRow>
-          <FieldRow label="Adress">
-            <input style={inp} value={content.address} onChange={e => set('address', e.target.value)} />
-          </FieldRow>
-          {(demo.template === 'restaurang' || demo.template === 'verkstad') && (
-            <FieldRow label="Öppettider">
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <input style={inp} value={content.openingHours || ''} onChange={e => set('openingHours', e.target.value)} />
-                <AIButton field="openingHours" value={content.openingHours || ''} template={demo.template} businessName={content.businessName} onResult={v => set('openingHours', v)} />
+        {/* Section panel (scrollable) */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {selectedSection === null ? (
+            /* ── Section list ── */
+            <>
+              <div style={{ padding: '12px 16px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                Sektioner
               </div>
-            </FieldRow>
+              {sections.map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSelectedSection(s.id)}
+                  style={{
+                    width: '100%', padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10,
+                    background: 'none', border: 'none', borderBottom: '1px solid var(--border)',
+                    cursor: 'pointer', textAlign: 'left', color: 'var(--text)',
+                    fontSize: 13, fontWeight: 500,
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  <span style={{ fontSize: 16 }}>{s.icon}</span>
+                  <span style={{ flex: 1 }}>{s.label}</span>
+                  <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>›</span>
+                </button>
+              ))}
+
+              {/* Gallery section (if active) */}
+              {hasGallery && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedSection('gallery')}
+                  style={{ width: '100%', padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left', color: 'var(--text)', fontSize: 13, fontWeight: 500 }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  <span style={{ fontSize: 16 }}>📷</span>
+                  <span style={{ flex: 1 }}>Galleri</span>
+                  <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>›</span>
+                </button>
+              )}
+
+              {/* Add section */}
+              <div style={{ padding: '12px 16px' }}>
+                {!showAddSection ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSection(true)}
+                    style={{ width: '100%', padding: '8px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                  >
+                    + Lägg till sektion
+                  </button>
+                ) : (
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 12px', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>Välj sektion att lägga till</div>
+                    {!hasGallery && (
+                      <button
+                        type="button"
+                        onClick={() => { set('galleryImages', []); setShowAddSection(false); setSelectedSection('gallery'); }}
+                        style={{ width: '100%', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left', fontSize: 13 }}
+                      >
+                        <span>📷</span> Galleri
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowAddSection(false)}
+                      style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)' }}
+                    >
+                      Avbryt
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            /* ── Section detail ── */
+            <>
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedSection(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 18, padding: '2px 4px', lineHeight: 1 }}
+                >
+                  ←
+                </button>
+                <span style={{ fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  {SECTION_LABELS[selectedSection] ?? selectedSection}
+                </span>
+
+                {/* Remove gallery option */}
+                {selectedSection === 'gallery' && (
+                  <button
+                    type="button"
+                    onClick={() => { set('galleryImages', undefined); setSelectedSection(null); }}
+                    style={{ marginLeft: 'auto', background: 'none', border: '1px solid var(--red-border)', color: 'var(--red)', borderRadius: 6, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}
+                  >
+                    Ta bort
+                  </button>
+                )}
+              </div>
+              <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <SectionControls
+                  section={selectedSection}
+                  template={demo.template}
+                  content={content}
+                  set={set}
+                  demoId={id}
+                />
+              </div>
+            </>
           )}
-        </Section>
-
-        <Section title="Bilder">
-          <ImageUpload label="Logo" value={content.logoUrl} field="logoUrl" demoId={id} onChange={v => set('logoUrl', v)} />
-          <ImageUpload label="Hero-bild (bakgrund)" value={content.heroImageUrl} field="heroImageUrl" demoId={id} onChange={v => set('heroImageUrl', v)} />
-        </Section>
-
-        {/* Template-specific sections */}
-        {demo.template === 'restaurang' && content.menuItems && (
-          <Section title={`Meny (${content.menuItems.length} rätter)`}>
-            {content.menuItems.map((item, i) => (
-              <div key={i} style={{ background: 'var(--bg)', borderRadius: 8, padding: 10, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>Rätt {i + 1}</span>
-                  <button type="button" onClick={() => set('menuItems', (content.menuItems || []).filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 16 }}>×</button>
-                </div>
-                <input style={inp} placeholder="Namn" value={item.name} onChange={e => setMenuItem(i, 'name', e.target.value)} />
-                <input style={inp} placeholder="Beskrivning" value={item.description} onChange={e => setMenuItem(i, 'description', e.target.value)} />
-                <input style={inp} placeholder="Pris (t.ex. 135 kr)" value={item.price} onChange={e => setMenuItem(i, 'price', e.target.value)} />
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => set('menuItems', [...(content.menuItems || []), { name: '', description: '', price: '' }])}
-              style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-            >+ Lägg till rätt</button>
-          </Section>
-        )}
-
-        {(demo.template === 'hantverkare' || demo.template === 'verkstad') && content.serviceList && (
-          <Section title={`Tjänster (${content.serviceList.length})`}>
-            {content.serviceList.map((s, i) => (
-              <div key={i} style={{ display: 'flex', gap: 6 }}>
-                <input style={{ ...inp, flex: 1 }} value={s} onChange={e => setServiceListItem(i, e.target.value)} placeholder={`Tjänst ${i + 1}`} />
-                <button type="button" onClick={() => set('serviceList', (content.serviceList || []).filter((_, j) => j !== i))} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '0 8px', color: 'var(--text-faint)', cursor: 'pointer' }}>×</button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => set('serviceList', [...(content.serviceList || []), ''])}
-              style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-            >+ Lägg till tjänst</button>
-          </Section>
-        )}
-
-        {demo.template === 'tjansteforetag' && content.serviceFeatures && (
-          <Section title={`Tjänster / Features (${content.serviceFeatures.length})`}>
-            {content.serviceFeatures.map((f, i) => (
-              <div key={i} style={{ background: 'var(--bg)', borderRadius: 8, padding: 10, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>Feature {i + 1}</span>
-                  <button type="button" onClick={() => set('serviceFeatures', (content.serviceFeatures || []).filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 16 }}>×</button>
-                </div>
-                <input style={inp} placeholder="Titel" value={f.title} onChange={e => setServiceFeature(i, 'title', e.target.value)} />
-                <textarea style={{ ...inp, resize: 'vertical', minHeight: 52 }} placeholder="Beskrivning" value={f.description} onChange={e => setServiceFeature(i, 'description', e.target.value)} />
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => set('serviceFeatures', [...(content.serviceFeatures || []), { title: '', description: '' }])}
-              style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-            >+ Lägg till feature</button>
-          </Section>
-        )}
-
-        {demo.template === 'verkstad' && content.brands && (
-          <Section title={`Bilmärken (${content.brands.length})`}>
-            {content.brands.map((b, i) => (
-              <div key={i} style={{ display: 'flex', gap: 6 }}>
-                <input style={{ ...inp, flex: 1 }} value={b} onChange={e => setBrand(i, e.target.value)} placeholder={`Märke ${i + 1}`} />
-                <button type="button" onClick={() => set('brands', (content.brands || []).filter((_, j) => j !== i))} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '0 8px', color: 'var(--text-faint)', cursor: 'pointer' }}>×</button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => set('brands', [...(content.brands || []), ''])}
-              style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-            >+ Lägg till märke</button>
-          </Section>
-        )}
-
-        {demo.template === 'hantverkare' && (
-          <Section title="Galleri (bilder)">
-            {(content.galleryImages || []).filter(Boolean).map((url, i) => (
-              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <img src={url} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
-                <input style={{ ...inp, flex: 1 }} value={url} onChange={e => {
-                  const imgs = [...(content.galleryImages || [])];
-                  imgs[i] = e.target.value;
-                  set('galleryImages', imgs);
-                }} placeholder="Bild-URL" />
-                <button type="button" onClick={() => set('galleryImages', (content.galleryImages || []).filter((_, j) => j !== i))} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '0 8px', color: 'var(--text-faint)', cursor: 'pointer' }}>×</button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => set('galleryImages', [...(content.galleryImages || []), ''])}
-              style={{ padding: '7px 0', fontSize: 12, borderRadius: 7, border: '1px dashed var(--border)', background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-            >+ Lägg till bild-URL</button>
-          </Section>
-        )}
+        </div>
       </div>
 
       {/* ── Right panel: preview ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: previewDevice === 'mobile' ? '#d1d5db' : '#f0f0f0' }}>
-        {/* Device toggle */}
-        <div style={{ padding: '8px 12px', display: 'flex', gap: 6, borderBottom: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>
-          {(['desktop', 'mobile'] as const).map(d => (
-            <button key={d} onClick={() => setPreviewDevice(d)} style={{
-              padding: '4px 12px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: 'none', cursor: 'pointer',
-              background: previewDevice === d ? '#1a1a1a' : 'rgba(0,0,0,0.07)',
-              color: previewDevice === d ? 'white' : '#666',
-            }}>
-              {d === 'desktop' ? '🖥 Desktop' : '📱 Mobil'}
-            </button>
-          ))}
-        </div>
-
         {previewDevice === 'desktop' ? (
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            <div style={{ transform: 'scale(0.75)', transformOrigin: 'top left', width: '133.33%', pointerEvents: 'none' }}>
-              {renderTemplate(demo.template, content)}
+            <div style={{ transform: 'scale(0.75)', transformOrigin: 'top left', width: '133.33%' }}>
+              {renderTemplate(demo.template, content, editProps)}
             </div>
           </div>
         ) : (
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', justifyContent: 'center', padding: '32px 24px' }}>
-            <div style={{
-              width: 390, flexShrink: 0,
-              border: '10px solid #1a1a1a', borderRadius: 44,
-              overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
-              background: 'white', pointerEvents: 'none',
-            }}>
-              {/* zoom skalar layout + höjd korrekt, till skillnad från transform:scale */}
+            <div style={{ width: 390, flexShrink: 0, border: '10px solid #1a1a1a', borderRadius: 44, overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.4)', background: 'white' }}>
               <div style={{ zoom: 0.305 } as React.CSSProperties}>
-                {renderTemplate(demo.template, content)}
+                {renderTemplate(demo.template, content, editProps)}
               </div>
             </div>
           </div>

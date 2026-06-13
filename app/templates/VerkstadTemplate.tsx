@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { DemoContent } from './types';
+import EditableSection from './EditableSection';
 
 const HEADLINE = "'Oswald', sans-serif";
 const BODY = "'Open Sans', sans-serif";
@@ -174,10 +175,18 @@ function BookingModal({ open, onClose, primary }: { open: boolean; onClose: () =
   );
 }
 
+interface VerkstadProps {
+  content: DemoContent;
+  editMode?: boolean;
+  selectedSection?: string | null;
+  onSectionClick?: (id: string) => void;
+}
+
 // ── Main template ─────────────────────────────────────────────────────────────
-export default function VerkstadTemplate({ content }: { content: DemoContent }) {
+export default function VerkstadTemplate({ content, editMode, selectedSection, onSectionClick }: VerkstadProps) {
   const [bookingOpen, setBookingOpen] = useState(false);
   const primary = content.primaryColor || '#9e001f';
+  const sel = (id: string) => selectedSection === id;
   const logo = content.logoUrl;
   const hero = content.heroImageUrl || DEFAULT_HERO;
   const services = content.serviceList ?? [];
@@ -198,11 +207,12 @@ export default function VerkstadTemplate({ content }: { content: DemoContent }) 
       <BookingModal open={bookingOpen} onClose={() => setBookingOpen(false)} primary={primary} />
 
       {/* ── Header ── */}
+      <EditableSection id="header" editMode={editMode} selected={sel('header')} onSelect={onSectionClick} outerStyle={{ position: 'sticky', top: 0, zIndex: 50 }}>
       <header style={{ background: '#f9f9f9', borderBottom: '2px solid #1a1c1c', position: 'sticky', top: 0, zIndex: 50 }}>
         <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 48px', maxWidth: 1280, margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {logo ? (
-              <img src={logo} alt={content.businessName} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
+              <img src={logo} alt={content.businessName} style={{ height: content.logoHeight ?? 40, maxWidth: (content.logoHeight ?? 40) * 4, objectFit: 'contain' }} />
             ) : (
               <div style={{ width: 40, height: 40, borderRadius: '50%', background: primary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontFamily: HEADLINE, fontWeight: 700, fontSize: 18 }}>
                 {content.businessName[0]}
@@ -227,8 +237,10 @@ export default function VerkstadTemplate({ content }: { content: DemoContent }) 
           </div>
         </nav>
       </header>
+      </EditableSection>
 
       {/* ── Hero ── */}
+      <EditableSection id="hero" editMode={editMode} selected={sel('hero')} onSelect={onSectionClick}>
       <section style={{ position: 'relative', height: 'min(90vh, 900px)', minHeight: 520, display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
         <img src={hero} alt={content.businessName} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 55%' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.05) 100%)' }} />
@@ -249,8 +261,10 @@ export default function VerkstadTemplate({ content }: { content: DemoContent }) 
           </div>
         </div>
       </section>
+      </EditableSection>
 
       {/* ── Tjänster ── */}
+      <EditableSection id="services" editMode={editMode} selected={sel('services')} onSelect={onSectionClick}>
       <section style={{ padding: '80px 48px', maxWidth: 1280, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 56 }}>
           <h2 style={{ fontFamily: HEADLINE, fontSize: 48, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '-0.02em', margin: 0 }}>
@@ -287,8 +301,10 @@ export default function VerkstadTemplate({ content }: { content: DemoContent }) 
           ))}
         </div>
       </section>
+      </EditableSection>
 
       {/* ── Erbjudanden ── */}
+      <EditableSection id="offers" editMode={editMode} selected={sel('offers')} onSelect={onSectionClick}>
       <section style={{ background: '#f4f3f3', padding: '80px 48px' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto' }}>
           <div style={{ marginBottom: 40 }}>
@@ -326,8 +342,10 @@ export default function VerkstadTemplate({ content }: { content: DemoContent }) 
           </div>
         </div>
       </section>
+      </EditableSection>
 
       {/* ── Info / Kontakt ── */}
+      <EditableSection id="contact" editMode={editMode} selected={sel('contact')} onSelect={onSectionClick}>
       <section style={{ padding: '80px 48px', maxWidth: 1280, margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80 }}>
           <div>
@@ -362,9 +380,11 @@ export default function VerkstadTemplate({ content }: { content: DemoContent }) 
           </div>
         </div>
       </section>
+      </EditableSection>
 
       {/* ── Märken ── */}
       {brands.length > 0 && (
+        <EditableSection id="brands" editMode={editMode} selected={sel('brands')} onSelect={onSectionClick}>
         <section style={{ background: '#2f3131', padding: '48px' }}>
           <div style={{ maxWidth: 1280, margin: '0 auto', textAlign: 'center' }}>
             <p style={{ fontFamily: BODY, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#9e9e9e', marginBottom: 24 }}>Märken vi arbetar med</p>
@@ -375,6 +395,26 @@ export default function VerkstadTemplate({ content }: { content: DemoContent }) 
             </div>
           </div>
         </section>
+        </EditableSection>
+      )}
+
+      {/* ── Galleri (optional section) ── */}
+      {content.galleryImages && content.galleryImages.length > 0 && (
+        <EditableSection id="gallery" editMode={editMode} selected={sel('gallery')} onSelect={onSectionClick}>
+        <section style={{ padding: '80px 48px' }}>
+          <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+            <div style={{ textAlign: 'center', marginBottom: 40 }}>
+              <h2 style={{ fontFamily: HEADLINE, fontSize: 48, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '-0.02em', margin: 0 }}>Galleri</h2>
+              <div style={{ width: 96, height: 6, background: primary, margin: '14px auto 0' }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
+              {content.galleryImages.filter(Boolean).map((url, i) => (
+                <img key={i} src={url} alt="" style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover' }} />
+              ))}
+            </div>
+          </div>
+        </section>
+        </EditableSection>
       )}
 
       {/* ── Footer ── */}
@@ -384,7 +424,7 @@ export default function VerkstadTemplate({ content }: { content: DemoContent }) 
             <div style={{ maxWidth: 300 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
                 {logo ? (
-                  <img src={logo} alt={content.businessName} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }} />
+                  <img src={logo} alt={content.businessName} style={{ height: content.logoHeight ?? 44, maxWidth: (content.logoHeight ?? 44) * 4, objectFit: 'contain' }} />
                 ) : (
                   <div style={{ width: 48, height: 48, borderRadius: '50%', background: primary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontFamily: HEADLINE, fontWeight: 700, fontSize: 20 }}>
                     {content.businessName[0]}
