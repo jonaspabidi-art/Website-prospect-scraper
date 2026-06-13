@@ -25,6 +25,9 @@ export default function HantverkareTemplate({ content, editMode, selectedSection
             ? <img src={content.logoUrl} alt="Logo" style={{ height: content.logoHeight ?? 40, maxWidth: (content.logoHeight ?? 40) * 4, objectFit: 'contain' }} />
             : <span style={{ fontWeight: 800, fontSize: 20, color: c }}>{content.businessName}</span>
           }
+          {content.logoUrl && content.showBusinessName !== false && (
+            <span style={{ fontWeight: 700, fontSize: 18, color: c }}>{content.businessName}</span>
+          )}
         </div>
         <a href={`tel:${content.phone}`} style={{
           padding: '9px 22px', background: c, color: '#fff',

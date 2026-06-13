@@ -24,6 +24,9 @@ export default function TjansteforetagTemplate({ content, editMode, selectedSect
             ? <img src={content.logoUrl} alt="Logo" style={{ height: content.logoHeight ?? 38, maxWidth: (content.logoHeight ?? 38) * 4, objectFit: 'contain' }} />
             : <span style={{ fontWeight: 800, fontSize: 20, background: `linear-gradient(135deg, ${c}, #4f46e5)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{content.businessName}</span>
           }
+          {content.logoUrl && content.showBusinessName !== false && (
+            <span style={{ fontWeight: 800, fontSize: 20, background: `linear-gradient(135deg, ${c}, #4f46e5)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{content.businessName}</span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <a href={`mailto:${content.email}`} style={{ color: '#374151', textDecoration: 'none', fontSize: 14, fontWeight: 500 }}>Kontakt</a>

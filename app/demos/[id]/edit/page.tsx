@@ -273,14 +273,12 @@ function SectionControls({
               <FieldRow label={`Logostorlek — ${content.logoHeight ?? 40}px`}>
                 <input type="range" min={20} max={120} step={2} value={content.logoHeight ?? 40} onChange={e => set('logoHeight', Number(e.target.value))} style={{ width: '100%', cursor: 'pointer' }} />
               </FieldRow>
-              {template === 'verkstad' && (
-                <FieldRow label="Visa företagsnamn bredvid loggan">
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text)' }}>
-                    <input type="checkbox" checked={content.showBusinessName !== false} onChange={e => set('showBusinessName', e.target.checked)} />
-                    {content.showBusinessName !== false ? 'Visas' : 'Dolt'}
-                  </label>
-                </FieldRow>
-              )}
+              <FieldRow label="Visa företagsnamn bredvid loggan">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text)' }}>
+                  <input type="checkbox" checked={content.showBusinessName !== false} onChange={e => set('showBusinessName', e.target.checked)} />
+                  {content.showBusinessName !== false ? 'Visas' : 'Dolt'}
+                </label>
+              </FieldRow>
             </>
           )}
           <FieldRow label="Företagsnamn">
